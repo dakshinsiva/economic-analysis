@@ -64,6 +64,6 @@ uv run pytest                                           # offline tests
 - **`logs/run-<thread>.jsonl`**: structured events (FRED latency, cache hits,
   node updates, token usage). Works offline.
 - **LangGraph Studio** (`langgraph dev`): step through nodes visually.
-- **LangSmith**: set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY` for hosted traces.
+- **LangSmith**: set `LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY` in `.env`; `config.py` exports `.env` into the process so both the CLI and Studio trace to `LANGSMITH_PROJECT`.
 
 Details and war stories in `docs/02-debugging.md`.

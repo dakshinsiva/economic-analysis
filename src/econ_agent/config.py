@@ -10,10 +10,16 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# Export .env into os.environ so libraries that read the environment directly
+# (LangSmith tracing, the Anthropic SDK) see the same values the Settings do.
+# Existing shell variables win: override=False.
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 
 class Settings(BaseSettings):
