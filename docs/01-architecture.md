@@ -117,3 +117,37 @@ with first question and message count), rename (`copy_thread` + delete) and
 delete. Thread ids are free-form strings, so readable names are the convention.
 Nodes read `user_id` with `langgraph.config.get_config()`, which works for the
 CLI, the REST API and Studio alike.
+
+## Additions on 2026-10-13 (the "build everything" pass)
+
+**Eighteen tools.** The original eight plus ALFRED vintages (`series_as_of`, `revision_history`,
+`release_calendar`) and analytics (`extremes`, `percentile_rank`, `compare_to_prepandemic`,
+`sahm_rule`, `recession_probability`, `correlate`, `macro_snapshot`). `extremes` exists because
+the window summary gives a max without its date; the planner is told to call it whenever a
+peak or low is mentioned.
+
+**Argument validation in the planner.** Structured output fixes the shape of a `Plan`, not the
+contents of each step's `args`. `_validate_steps` checks them against the tool's `args_schema`;
+the planner retries once with the errors, then drops anything still invalid.
+
+**Prior evidence.** `prior_evidence` in state carries the previous turns' evidence (capped,
+marked `prior=True`) so follow-ups cite real data instead of the previous answer's prose. The
+analyst sees it as evidence; the critic checks against it.
+
+**Numeric grounding in the critic.** `_numeric_checks` requires every number in the draft to
+be in the evidence (directly or scaled by 10^3 / 10^6), or derivable as a pairwise difference
+or percent change within an evidence block. Years and small unitless counts are exempt;
+"7,437,970 thousand" is flagged as a unit error. Calibrated to zero false positives on twenty
+recorded drafts; measured at precision 1.0 / recall 1.0 on `evals/critic_cases.yaml`.
+
+**Concurrent fetch, retries, staleness.** Steps run in a small thread pool; the FRED client
+retries transient failures with backoff and flags series whose last observation is older than
+their frequency suggests.
+
+**Editable plans.** `review` accepts `{"plan": {...}}` on resume; the web UI edits steps inline.
+
+**Persistence factory.** `persistence.open_persistence` returns SQLite or Postgres
+checkpointer + store from `DATABASE_URL`; verified against Postgres 16 in Docker.
+
+**Passthrough hardening.** The web API route allows only the endpoints the desk uses and
+rate-limits per IP, so a public deployment exposes a narrow surface.
