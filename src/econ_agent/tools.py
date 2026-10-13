@@ -170,9 +170,9 @@ def yield_curve_snapshot(as_of: Optional[str] = None) -> str:
     flag = "INVERTED (10y<2y)" if s10_2 < 0 else "normal (10y>2y)"
     prev = df.iloc[0]
     return (
-        f"Yield curve as of {d} (percent):\n"
-        f"  3mo {row.DGS3MO:.2f}  2y {row.DGS2:.2f}  10y {row.DGS10:.2f}  30y {row.DGS30:.2f}\n"
-        f"  10y-2y spread {s10_2:+.2f}  |  10y-3m spread {s10_3m:+.2f}  ->  {flag}\n"
+        f"Yield curve as of {d} (percent). Cite as (DGS10, {d}) etc.\n"
+        f"  DGS3MO {row.DGS3MO:.2f}  DGS2 {row.DGS2:.2f}  DGS10 {row.DGS10:.2f}  DGS30 {row.DGS30:.2f}\n"
+        f"  10y-2y spread {s10_2:+.2f} (DGS10-DGS2)  |  10y-3m spread {s10_3m:+.2f} (DGS10-DGS3MO)  ->  {flag}\n"
         f"  30 days earlier ({df.index[0].date()}): 10y-2y {prev.DGS10 - prev.DGS2:+.2f}, "
         f"10y-3m {prev.DGS10 - prev.DGS3MO:+.2f}"
     )

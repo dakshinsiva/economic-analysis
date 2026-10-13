@@ -24,6 +24,7 @@ econ = "econ_agent.cli:main"
 dev = [
     "pytest>=8",
     "langgraph-cli[inmem]>=0.4",
+    "grandalf>=0.8",
 ]
 
 [build-system]

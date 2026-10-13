@@ -11,3 +11,19 @@
 - **Grounding is verified, not assumed.** See debugging note 4.
 - **Environment-driven failures** (base URL gateway, native wheels) are the
   most common real-world blockers; know how to localise them fast.
+
+## Stage 2 additions
+- **Prebuilt vs hand-built.** `create_agent` = one model node + tool node; the
+  model decides everything. The v2 graph separates *deciding* (planner),
+  *approving* (human), *doing* (fetch, no LLM), *writing* (analyst) and
+  *checking* (critic). Each is independently testable and observable.
+- **Human-in-the-loop done right.** `interrupt()` inside a node with a
+  descriptive payload; resume with `Command(resume=...)`. Same code path for
+  CLI, REST and Studio.
+- **Why a critic and not just a better prompt.** Prompts reduce the rate of
+  unsupported claims; the critic makes them *detectable*. The regex half is
+  free and exact; the LLM half handles judgement. Debugging notes 4 and 10
+  are the before/after.
+- **Cost of Stage 2.** Three model calls minimum (planner, analyst, critic)
+  vs one or two for v1. Worth it when correctness matters more than latency;
+  `--v1` stays available for quick lookups.

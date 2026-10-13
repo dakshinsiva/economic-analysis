@@ -65,6 +65,45 @@ change needed; a planner node in Stage 2 will validate input explicitly.
 **Lesson.** Read the *warning* just above the traceback. The provider SDK often
 tells you what it sent before the server tells you why it refused.
 
+## 7. Circular import between graph.py and nodes.py
+**Symptom.** `AttributeError: partially initialized module 'econ_agent.nodes' has no attribute 'planner'`
+at test collection, right after adding Stage 2.
+**Cause.** `graph.py` imports `nodes` to build the graph; `nodes.py` imported
+`make_model` from `graph.py`. Python executes `graph.py` top to bottom, hits
+`import nodes`, which re-enters `graph.py` before `make_model` exists.
+**Fix.** Move `make_model` into `models.py`, which neither module depends on.
+**Lesson.** Module-level `graph = build_graph()` is convenient for Studio but
+makes import order load-bearing. Keep factories in leaf modules.
+
+## 8. My own critic node hit lesson 6
+**Symptom.** Stage 2 run died in the `critic` node with the same 400
+"messages: at least one message is required".
+**Cause.** I had put evidence and draft inside one `SystemMessage` and sent no
+human turn. Exactly the shape I had documented two hours earlier.
+**Fix.** Instructions in the system message; evidence + draft as the human turn.
+**Lesson.** Write a test that exercises the real prompt shape against a model
+stub that *validates* message roles, not just one that returns canned output.
+
+## 9. "Deserializing unregistered type econ_agent.state.Plan from checkpoint"
+**Symptom.** Warning on every `get_state` once Stage 2 stored Pydantic objects
+in graph state; LangGraph says this will become an error.
+**Cause.** The checkpointer serialises state with msgpack and only round-trips
+arbitrary classes via a registry. Custom types in state are a liability for
+Studio's server checkpointer and for Postgres later.
+**Fix.** State fields are plain dicts; nodes do `Plan.model_validate(...)` on
+the way in and `.model_dump()` on the way out.
+**Lesson.** Graph state is a wire format. Keep it JSON-shaped.
+
+## 10. A false alarm, and why it was worth chasing
+**Symptom.** A Stage 2 answer cited `(JTSLDL, 2022-09-01)` although I believed
+the plan had fetched only 36 recent observations.
+**How checked.** Loaded the thread's checkpoint, printed each evidence block,
+grepped the dates, and re-ran `_deterministic_checks` on the stored draft.
+**Finding.** This run's planner had asked for 48 observations; the dates were
+in the evidence and the critic was right to approve.
+**Lesson.** Inspect state before blaming the model. The checkpoint made the
+verification a 20-line script instead of a re-run.
+
 ## Toolkit cheat-sheet
 
 | Question | Tool |
@@ -73,6 +112,7 @@ tells you what it sent before the server tells you why it refused.
 | What is in state right now? | `/state` -> `graph.get_state(config)` |
 | What happened N steps ago? | `/history` -> `graph.get_state_history(config)` |
 | Re-run from an earlier point | `/replay N` -> stream with `checkpoint_id` in config |
+| Approve/edit a plan mid-run | Stage 2 `review` interrupt -> `Command(resume=...)` |
 | Visual step-through | `uv run langgraph dev` -> Studio |
 | Hosted traces, token costs | `LANGSMITH_TRACING=true` |
 | Deterministic repro without the API | `tests/test_graph.py` scripted model pattern |

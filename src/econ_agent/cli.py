@@ -3,6 +3,11 @@
     uv run econ "Is the labor market cooling? Use JOLTS."   # one-shot
     uv run econ                                               # REPL
     uv run econ --thread my-thread                            # resume a thread
+    uv run econ --v1 "..."                                    # Stage 1 ReAct agent
+    uv run econ --auto-approve "..."                          # skip plan review
+
+Stage 2 graphs pause after planning: press Enter to approve the plan, or type
+feedback (e.g. "use 10 years of history") to re-plan.
 
 Debug commands inside the REPL:
     /state          show the current checkpoint's state summary
@@ -23,16 +28,18 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.types import Command
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
 from econ_agent.config import get_settings
-from econ_agent.graph import build_graph
+from econ_agent.graph import build_graph, build_graph_v2
 from econ_agent.logging import log_event, setup_logging
 
 console = Console()
+AUTO_APPROVE = False
 
 
 def _cfg(thread_id: str, checkpoint_id: str | None = None) -> dict[str, Any]:
@@ -60,15 +67,59 @@ def _render_message(msg: BaseMessage) -> None:
         console.print(Panel(content, title=f"[bold {style}]tool result <- {msg.name}", border_style=style))
 
 
-def run_turn(graph, thread_id: str, user_input: str | None, checkpoint_id: str | None = None) -> None:
-    """Stream one turn. user_input=None resumes/replays from a checkpoint."""
-    payload = {"messages": [HumanMessage(user_input)]} if user_input else None
-    log_event("turn.start", thread_id=thread_id, input=user_input, checkpoint_id=checkpoint_id)
-    for chunk in graph.stream(payload, _cfg(thread_id, checkpoint_id), stream_mode="updates"):
+def _render_update(node: str, update: Any) -> None:
+    log_event("node.update", node=node)
+    if node == "__interrupt__":
+        return
+    if not isinstance(update, dict):
+        return
+    for m in update.get("messages", []):
+        _render_message(m)
+    if "plan" in update and update["plan"] is not None:
+        plan = update["plan"]
+        steps = "\n".join(f"{i}. {s['tool']}({json.dumps(s['args'])})  - {s['why']}" for i, s in enumerate(plan["steps"], 1))
+        console.print(Panel(f"[bold]{plan['goal']}[/]\n{steps}", title="[bold magenta]plan", border_style="magenta"))
+    if "evidence" in update and update["evidence"]:
+        for e in update["evidence"]:
+            style = "yellow" if e["ok"] else "red"
+            console.print(Panel(e["result"], title=f"[bold {style}]evidence <- {e['tool']}", border_style=style))
+    if "draft" in update and update["draft"]:
+        console.print(Panel(Markdown(update["draft"]), title=f"[bold blue]{node} draft", border_style="blue"))
+    if "critique" in update and update["critique"] is not None:
+        c = update["critique"]
+        ok = c["approved"]
+        body = "approved" if ok else "\n".join(f"- {i}" for i in c["issues"])
+        console.print(Panel(body, title=f"[bold {'green' if ok else 'red'}]critic", border_style="green" if ok else "red"))
+
+
+def _stream(graph, payload, cfg) -> bool:
+    """Stream one graph run. Returns True if the run paused at an interrupt."""
+    interrupted = False
+    for chunk in graph.stream(payload, cfg, stream_mode="updates"):
         for node, update in chunk.items():
-            log_event("node.update", node=node, n_messages=len((update or {}).get("messages", [])))
-            for m in (update or {}).get("messages", []):
-                _render_message(m)
+            if node == "__interrupt__":
+                interrupted = True
+            _render_update(node, update)
+    return interrupted
+
+
+def run_turn(graph, thread_id: str, user_input: str | None, checkpoint_id: str | None = None) -> None:
+    """Stream one turn. user_input=None resumes/replays from a checkpoint.
+    If the graph pauses for plan review, ask the human and resume until it finishes."""
+    payload = {"messages": [HumanMessage(user_input)]} if user_input else None
+    cfg = _cfg(thread_id, checkpoint_id)
+    log_event("turn.start", thread_id=thread_id, input=user_input, checkpoint_id=checkpoint_id)
+    interrupted = _stream(graph, payload, cfg)
+    while interrupted:
+        console.print("[magenta]Plan review:[/] press Enter to approve, or type feedback to re-plan.")
+        if AUTO_APPROVE:
+            decision = "approve"
+        else:
+            try:
+                decision = console.input("[bold magenta]review>[/] ").strip()
+            except (EOFError, KeyboardInterrupt):
+                decision = "approve"
+        interrupted = _stream(graph, Command(resume=decision or "approve"), _cfg(thread_id))
     log_event("turn.end", thread_id=thread_id)
 
 
@@ -139,6 +190,8 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="econ", description="FRED economic-analysis agent")
     p.add_argument("question", nargs="*", help="one-shot question; omit for REPL")
     p.add_argument("--thread", default=None, help="thread id to resume (default: new)")
+    p.add_argument("--v1", action="store_true", help="use the Stage 1 prebuilt ReAct agent instead of the Stage 2 graph")
+    p.add_argument("--auto-approve", action="store_true", help="skip the plan review prompt (Stage 2)")
     args = p.parse_args(argv)
 
     settings = get_settings()
@@ -146,7 +199,10 @@ def main(argv: list[str] | None = None) -> None:
     setup_logging(settings.log_dir, thread_id, settings.log_level)
 
     conn = sqlite3.connect(str(settings.checkpoint_db), check_same_thread=False)
-    graph = build_graph(checkpointer=SqliteSaver(conn))
+    saver = SqliteSaver(conn)
+    graph = build_graph(checkpointer=saver) if args.v1 else build_graph_v2(checkpointer=saver)
+    global AUTO_APPROVE
+    AUTO_APPROVE = args.auto_approve
 
     if args.question:
         run_turn(graph, thread_id, " ".join(args.question))

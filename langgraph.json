@@ -1,7 +1,10 @@
 {
-  "dependencies": ["."],
+  "dependencies": [
+    "."
+  ],
   "graphs": {
-    "econ_agent": "./src/econ_agent/graph.py:graph"
+    "econ_agent": "./src/econ_agent/graph.py:graph",
+    "econ_agent_v2": "./src/econ_agent/graph.py:graph_v2"
   },
   "env": ".env"
 }

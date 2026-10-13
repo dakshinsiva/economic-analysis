@@ -44,8 +44,39 @@ appends Human -> AI(tool_calls) -> Tool -> ... -> AI(final).
   returning scripted `AIMessage`s. Assert on the **trajectory** (which tools,
   which args, message count in the checkpoint), never on prose.
 
-## What Stage 2 changes
+## Stage 2 graph (`graph_v2`, `build_graph_v2`)
 
-Replace the prebuilt loop with an explicit `StateGraph`:
-planner (structured output) -> fetch (deterministic) -> analyst -> critic -> finalize,
-with `interrupt_before=["fetch"]` for human approval and a critic loop guard.
+```
+START -> planner -> review -> fetch -> analyst -> critic -> finalize -> END
+                      |  ^                 ^         |
+                      |  '-- feedback      '-- reject (max 2)
+                      '-- interrupt(): human approves or edits the plan
+```
+
+| Node | LLM? | In -> out |
+|---|---|---|
+| `planner` | yes, structured output (`Plan`) | question (+ feedback) -> `plan` |
+| `review` | no | `interrupt()` with the plan; resume `"approve"` or feedback text -> `plan_feedback` |
+| `fetch` | no | executes each step's tool deterministically -> `evidence` (errors recorded, not raised) |
+| `analyst` | yes | evidence (+ critique) -> `draft` |
+| `critic` | yes + regex | deterministic citation check + LLM fact-check -> `critique`, `revisions += 1` |
+| `finalize` | no | `draft` -> `messages` (with a reviewer note if still rejected) |
+
+Design decisions worth defending:
+- **Plan is data.** Structured output turns "which tools" into something a
+  human can approve or edit before any money/time is spent.
+- **Fetch has no LLM.** Deterministic execution of an approved plan is cheap,
+  testable, and never hallucinates.
+- **Critic combines a regex check and an LLM check.** The regex catches
+  citations of series/dates that were never fetched (free, exact). The LLM
+  catches uncited numbers and historical claims (judgement). Both must pass.
+- **Loop guard.** `revisions < MAX_REVISIONS` on the conditional edge, and
+  `finalize` appends the unresolved issues rather than hiding them.
+- **State holds plain dicts.** Pydantic models are validated inside nodes and
+  stored as `model_dump()` so every checkpointer can serialise them.
+- **Dynamic `interrupt()` over `interrupt_before`.** The payload tells the
+  human what to decide, and `Command(resume=...)` carries their answer; works
+  identically from the CLI, the REST API, and Studio.
+
+Tests: `tests/test_graph_v2.py` scripts the three LLM factories and asserts on
+routing (pause at review, re-plan on feedback, bounce on rejection, cap).

@@ -10,10 +10,9 @@ Two entry points on purpose:
 
 from __future__ import annotations
 
-from langchain_anthropic import ChatAnthropic
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
-from econ_agent.config import get_settings
+from econ_agent.models import make_model
 from econ_agent.tools import ALL_TOOLS
 
 SYSTEM_PROMPT = """You are an economic analyst assistant with live access to FRED (Federal Reserve Economic Data).
@@ -31,11 +30,6 @@ How to work:
 Today's date is available from the latest observations; JOLTS lags ~6 weeks, GDP ~1 month after quarter end, Treasury yields are daily."""
 
 
-def make_model() -> ChatAnthropic:
-    s = get_settings()
-    return ChatAnthropic(model=s.model, max_tokens=s.max_tokens)
-
-
 def build_graph(checkpointer: BaseCheckpointSaver | None = None):
     from langchain.agents import create_agent
 
@@ -50,3 +44,33 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
 
 # For `langgraph dev` (Studio). No checkpointer: the server provides one.
 graph = build_graph()
+
+
+# --------------------------------------------------------------------------- #
+# Stage 2: explicit StateGraph with human-in-the-loop and a critic loop.
+# --------------------------------------------------------------------------- #
+def build_graph_v2(checkpointer: BaseCheckpointSaver | None = None):
+    from langgraph.graph import END, START, StateGraph
+
+    from econ_agent import nodes
+    from econ_agent.state import AgentState
+
+    g = StateGraph(AgentState)
+    g.add_node("planner", nodes.planner)
+    g.add_node("review", nodes.review)
+    g.add_node("fetch", nodes.fetch)
+    g.add_node("analyst", nodes.analyst)
+    g.add_node("critic", nodes.critic)
+    g.add_node("finalize", nodes.finalize)
+
+    g.add_edge(START, "planner")
+    g.add_edge("planner", "review")
+    g.add_conditional_edges("review", nodes.route_after_review, {"planner": "planner", "fetch": "fetch"})
+    g.add_edge("fetch", "analyst")
+    g.add_edge("analyst", "critic")
+    g.add_conditional_edges("critic", nodes.route_after_critic, {"analyst": "analyst", "finalize": "finalize"})
+    g.add_edge("finalize", END)
+    return g.compile(checkpointer=checkpointer, name="econ_agent_v2")
+
+
+graph_v2 = build_graph_v2()
