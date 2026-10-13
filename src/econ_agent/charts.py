@@ -67,3 +67,17 @@ def plot_small_multiples(
     fig.savefig(path, dpi=150, facecolor=SURFACE)
     plt.close(fig)
     return path
+
+
+def chart_payload(series: dict[str, pd.Series], units: dict[str, str], titles: dict[str, str],
+                  title: str, recessions: list[tuple[pd.Timestamp, pd.Timestamp]] | None = None) -> dict:
+    """JSON-serialisable version of a chart for web clients (one panel per series)."""
+    return {
+        "title": title,
+        "panels": [
+            {"id": sid, "title": titles.get(sid, ""), "units": units.get(sid, ""),
+             "points": [{"d": d.strftime("%Y-%m-%d"), "v": round(float(v), 4)} for d, v in s.items()]}
+            for sid, s in series.items()
+        ],
+        "recessions": [{"from": a.strftime("%Y-%m-%d"), "to": b.strftime("%Y-%m-%d")} for a, b in (recessions or [])],
+    }

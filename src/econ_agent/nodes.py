@@ -18,7 +18,7 @@ from econ_agent.models import make_model
 from econ_agent.logging import log_event
 from econ_agent.memory import current_user_id, recall_feedback, remember_feedback
 from econ_agent.state import AgentState, Critique, Evidence, Plan
-from econ_agent.tools import ALL_TOOLS
+from econ_agent.tools import ALL_TOOLS, plot_series_payload
 
 TOOLS_BY_NAME = {t.name: t for t in ALL_TOOLS}
 MAX_REVISIONS = 2
@@ -80,8 +80,8 @@ def planner(state: AgentState, runtime: Runtime) -> dict[str, Any]:
         prompt.append(HumanMessage(f"Revise the plan with this feedback: {feedback}"))
     plan: Plan = planner_llm().invoke(prompt)
     log_event("planner.done", n_steps=len(plan.steps), tools=[s.tool for s in plan.steps], feedback=feedback)
-    return {"plan": plan.model_dump(), "plan_feedback": None, "evidence": [], "draft": "", "critique": None,
-            "revisions": 0}
+    return {"plan": plan.model_dump(), "plan_feedback": None, "evidence": [], "charts": [], "draft": "",
+            "critique": None, "revisions": 0}
 
 
 def review(state: AgentState, runtime: Runtime) -> dict[str, Any]:
@@ -109,6 +109,7 @@ def route_after_review(state: AgentState) -> str:
 def fetch(state: AgentState) -> dict[str, Any]:
     """Deterministic: execute the approved plan. No LLM involved."""
     evidence: list[dict[str, Any]] = []
+    charts: list[dict[str, Any]] = []
     for step in Plan.model_validate(state["plan"]).steps:
         tool = TOOLS_BY_NAME[step.tool]
         try:
@@ -117,8 +118,15 @@ def fetch(state: AgentState) -> dict[str, Any]:
         except Exception as e:  # bad args etc. -> keep going, record it
             result, ok = f"ERROR: {type(e).__name__}: {e}", False
         evidence.append(Evidence(tool=step.tool, args=step.args, result=str(result), ok=ok).model_dump())
+        if step.tool == "plot_series" and ok:
+            try:
+                payload = plot_series_payload(**step.args)
+                if payload:
+                    charts.append(payload)
+            except Exception as e:  # chart data is a nice-to-have for web clients
+                log_event("fetch.chart_payload_failed", error=str(e))
         log_event("fetch.step", tool=step.tool, args=step.args, ok=ok, chars=len(str(result)))
-    return {"evidence": evidence}
+    return {"evidence": evidence, "charts": charts}
 
 
 ANALYST_SYSTEM = """You are an economic analyst. Write the answer to the user's question using ONLY the evidence
@@ -127,7 +135,7 @@ below. Hard rules:
   contain it, do not say it - say that it was not retrieved instead.
 - Cite each figure as (SERIES_ID, YYYY-MM-DD). State units.
 - Lead with the answer, then 3-6 evidence bullets, then caveats (release lags, revisions).
-- If a chart was produced, give the user its file path.
+- If a chart was produced, say so in one short line; the chart itself is shown to the user separately. Never include file paths.
 {critique_block}
 EVIDENCE:
 {evidence}"""

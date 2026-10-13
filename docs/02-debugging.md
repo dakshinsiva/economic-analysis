@@ -143,6 +143,27 @@ raising default. Capability checks by attribute name lie for ABCs.
 **Lesson.** Test against the real backend, and prefer a try/except around the
 operation over `hasattr` for optional capabilities.
 
+## 14. LangGraph SDK: "Failed to construct 'URL': Invalid URL"
+**Symptom.** First live run from the Next.js app threw inside `ThreadsClient.create`.
+Demo mode, which never calls the SDK, was fine.
+**Cause.** `useStream({ apiUrl: "/api" })`. The SDK builds `new URL(path, apiUrl)`,
+and a relative base is not a valid URL. The passthrough route was correct; the
+client never reached it.
+**Fix.** `apiUrl: \`${window.location.origin}/api\`` (the component only mounts in
+the browser).
+**Lesson.** When a library "can't reach the server", check what URL it actually
+constructed before debugging the server.
+
+## 15. Next.js 16: `export const revalidate` vs Cache Components
+**Symptom.** Build error "Route segment config 'revalidate' is not compatible with
+nextConfig.cacheComponents" on the FRED dashboard route.
+**Cause.** create-next-app 16 enables Cache Components, which replace the
+per-segment `revalidate` export with `fetch(..., { next: { revalidate } })` and
+`'use cache'`.
+**Fix.** Dropped the export; the upstream fetch already carried its own revalidate.
+**Lesson.** Framework defaults move; read the generated config before reaching for
+a pattern from memory.
+
 ## Toolkit cheat-sheet
 
 | Question | Tool |

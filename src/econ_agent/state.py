@@ -60,3 +60,4 @@ class AgentState(TypedDict, total=False):
     draft: str
     critique: dict[str, Any] | None
     revisions: int
+    charts: list[dict[str, Any]]   # JSON chart payloads for web clients (one per plot_series step)

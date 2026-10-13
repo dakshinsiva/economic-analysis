@@ -18,7 +18,7 @@ from typing import Optional
 import pandas as pd
 from langchain_core.tools import tool
 
-from econ_agent.charts import plot_small_multiples
+from econ_agent.charts import chart_payload, plot_small_multiples
 from econ_agent.config import PROJECT_ROOT, get_settings
 from econ_agent.fred.client import FredClient, FredError
 from econ_agent.fred.series import REGISTRY, TOPICS, by_topic
@@ -199,12 +199,7 @@ def recession_periods(since: str = "1990-01-01") -> str:
     return "NBER recessions: " + ("; ".join(periods) if periods else "none in window")
 
 
-@tool
-def plot_series(series_ids: list[str], start: Optional[str] = None, title: Optional[str] = None) -> str:
-    """Render a PNG line chart of one or more FRED series (one panel per series, shared time axis)
-    with NBER recession shading. Returns the file path to tell the user, plus what was plotted.
-    Use when the user asks to graph, chart, plot, or visualise. Max 6 series.
-    """
+def _chart_inputs(series_ids: list[str], start: Optional[str]):
     ids = [i.upper() for i in series_ids][:6]
     if start is None:
         start = (date.today() - timedelta(days=5 * 365)).isoformat()
@@ -214,8 +209,6 @@ def plot_series(series_ids: list[str], start: Optional[str] = None, title: Optio
             data[sid] = _client().get_series(sid, start)
         except FredError as e:
             errors.append(str(e))
-    if not data:
-        return "ERROR: " + " | ".join(errors)
     try:
         rec = _client().get_series("USREC", start)
         spans, a = [], None
@@ -230,6 +223,26 @@ def plot_series(series_ids: list[str], start: Optional[str] = None, title: Optio
         spans = []
     units = {sid: _units(sid) for sid in data}
     titles = {sid: (REGISTRY[sid].title if sid in REGISTRY else "") for sid in data}
+    return data, errors, spans, units, titles
+
+
+def plot_series_payload(series_ids: list[str], start: Optional[str] = None, title: Optional[str] = None) -> dict | None:
+    """Chart data for web clients; mirrors plot_series without writing a file."""
+    data, errors, spans, units, titles = _chart_inputs(series_ids, start)
+    if not data:
+        return None
+    return chart_payload(data, units, titles, title or ", ".join(data), spans)
+
+
+@tool
+def plot_series(series_ids: list[str], start: Optional[str] = None, title: Optional[str] = None) -> str:
+    """Render a PNG line chart of one or more FRED series (one panel per series, shared time axis)
+    with NBER recession shading. Returns the file path to tell the user, plus what was plotted.
+    Use when the user asks to graph, chart, plot, or visualise. Max 6 series.
+    """
+    data, errors, spans, units, titles = _chart_inputs(series_ids, start)
+    if not data:
+        return "ERROR: " + " | ".join(errors)
     path = plot_small_multiples(data, units, titles, PROJECT_ROOT / "outputs",
                                 title or ", ".join(data), spans)
     summary = "; ".join(f"{sid} {s.index[0].date()}..{s.index[-1].date()} latest {_fmt(float(s.iloc[-1]))} {units[sid]}"

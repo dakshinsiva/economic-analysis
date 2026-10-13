@@ -119,3 +119,11 @@ def test_review_feedback_is_remembered_and_recalled_next_thread(monkeypatch, fak
     g.invoke({"messages": [HumanMessage("another question")]}, cfg2)
     system_prompt = str(planner.calls[-1][0].content)
     assert "always use 10 years of history" in system_prompt  # new thread, memory applied
+
+
+def test_fetch_adds_chart_payload_for_plot_steps(fake_fred):
+    plan = Plan(goal="g", steps=[Step(tool="plot_series", args={"series_ids": ["JTSQUR"], "title": "q"}, why="w")])
+    out = nodes.fetch({"plan": plan.model_dump()})
+    assert out["evidence"][0]["ok"]
+    assert out["charts"][0]["panels"][0]["id"] == "JTSQUR"
+    assert out["charts"][0]["panels"][0]["points"][-1]["d"] == "2026-08-01"
