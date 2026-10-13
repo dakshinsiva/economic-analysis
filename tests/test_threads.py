@@ -5,11 +5,11 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 
-from econ_agent import nodes
-from econ_agent.graph import build_graph_v2
-from econ_agent.memory import recall_feedback
-from econ_agent.state import Critique
-from econ_agent.threads import delete_thread, latest_thread_id, list_threads, rename_thread
+from macrodesk import nodes
+from macrodesk.graph import build_graph_v2
+from macrodesk.memory import recall_feedback
+from macrodesk.state import Critique
+from macrodesk.threads import delete_thread, latest_thread_id, list_threads, rename_thread
 from tests.test_graph_v2 import PLAN, Canned, _wire
 
 

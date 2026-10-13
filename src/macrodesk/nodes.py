@@ -11,14 +11,15 @@ import re
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langgraph.config import get_stream_writer
 from langgraph.runtime import Runtime
 from langgraph.types import interrupt
 
-from econ_agent.models import make_model
-from econ_agent.logging import log_event
-from econ_agent.memory import current_user_id, recall_feedback, remember_feedback
-from econ_agent.state import AgentState, Critique, Evidence, Plan
-from econ_agent.tools import ALL_TOOLS, plot_series_payload
+from macrodesk.models import make_model
+from macrodesk.logging import log_event
+from macrodesk.memory import current_user_id, recall_feedback, remember_feedback
+from macrodesk.state import AgentState, Critique, Evidence, Plan
+from macrodesk.tools import ALL_TOOLS, plot_series_payload
 
 TOOLS_BY_NAME = {t.name: t for t in ALL_TOOLS}
 MAX_REVISIONS = 2
@@ -134,6 +135,8 @@ below. Hard rules:
 - Every number, date, peak, average or comparison you state must appear in the evidence. If the evidence does not
   contain it, do not say it - say that it was not retrieved instead.
 - Cite each figure as (SERIES_ID, YYYY-MM-DD). State units.
+- Units are already applied in the evidence: a value of 7,437.97 in a series whose units are "Thousands" means
+  7,437,970 (about 7.4 million). Write it as "7,438 thousand" or "about 7.4 million", never "7,437,970 thousand".
 - Lead with the answer, then 3-6 evidence bullets, then caveats (release lags, revisions).
 - If a chart was produced, say so in one short line; the chart itself is shown to the user separately. Never include file paths.
 {critique_block}
@@ -155,8 +158,20 @@ def analyst(state: AgentState) -> dict[str, Any]:
     prompt = [SystemMessage(ANALYST_SYSTEM.format(critique_block=critique_block,
                                                   evidence=_format_evidence(state["evidence"]))),
               HumanMessage(_last_user_text(state))]
-    msg = analyst_llm().invoke(prompt)
-    draft = msg.text if isinstance(getattr(msg, "text", None), str) else str(getattr(msg, "content", msg))
+    # Stream the draft token by token as custom events so clients can render it as it is written.
+    # (The checkpointed `draft` is still set once, below, when the node returns.)
+    try:
+        writer = get_stream_writer()
+    except Exception:  # not inside a graph run (unit tests calling the node directly)
+        writer = lambda _: None  # noqa: E731
+    writer({"draft_reset": True})
+    parts: list[str] = []
+    for chunk in analyst_llm().stream(prompt):
+        text = chunk.text if isinstance(getattr(chunk, "text", None), str) else ""
+        if text:
+            parts.append(text)
+            writer({"draft_delta": text})
+    draft = "".join(parts)
     log_event("analyst.draft", chars=len(draft), revision=state.get("revisions", 0))
     return {"draft": draft}
 

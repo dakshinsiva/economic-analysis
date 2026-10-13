@@ -1,10 +1,11 @@
-# econ-agent — an agentic research desk over FRED
+# macrodesk — an agentic macro research desk over FRED
 
 [![tests](https://github.com/dakshinsiva/economic-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/dakshinsiva/economic-analysis/actions/workflows/ci.yml)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![langgraph](https://img.shields.io/badge/langgraph-1.x-1c3c3c)
 ![next](https://img.shields.io/badge/next.js-16-black)
 ![license](https://img.shields.io/badge/license-MIT-green)
+[![live](https://img.shields.io/badge/live-macrodesk--agent.vercel.app-5598e7)](https://macrodesk-agent.vercel.app)
 
 Ask a macro question in plain English and get back an analyst's answer in which every number carries
 its FRED series id and observation date, with the data fetched live from the St. Louis Fed, a chart
@@ -12,7 +13,7 @@ when one helps, and a fact-checker's verdict on the draft. Before anything is fe
 you its plan and waits: approve it, or tell it to use ten years of history instead of three, and it
 re-plans. What you tell it at that step, it remembers next time.
 
-![econ-agent: plan, evidence, chart and a critic-checked answer for a JOLTS question](docs/images/cover-dark.png)
+![macrodesk: plan, evidence, chart and a critic-checked answer for a JOLTS question](docs/images/cover-dark.png)
 
 *A JOLTS question in the research desk. Top, the macro dashboard and the pipeline strip. Then the plan
 the agent proposed and the user approved, the evidence it fetched (a four-series JOLTS table), the
@@ -62,7 +63,7 @@ Stage 1 of the project, a prebuilt ReAct agent with the same tools, is kept as `
 
 ## The research desk
 
-The web app in `web/` is a Next.js front end to the LangGraph server. It is built for someone who
+The web app in `web/` is a Next.js front end to the LangGraph server, deployed at [macrodesk-agent.vercel.app](https://macrodesk-agent.vercel.app), where it replays a recorded run on arrival. It is built for someone who
 works with this data rather than for a chat demo:
 
 | | |
@@ -108,10 +109,10 @@ Python side (the agent, CLI, LangGraph server):
 ```bash
 uv sync
 cp .env.example .env            # FRED_API_KEY (free), ANTHROPIC_API_KEY, optional LANGSMITH_*
-uv run econ "Is the yield curve inverted right now?"   # pauses for plan approval
-uv run econ --auto-approve "..."                        # skip the review
-uv run econ --v1 "..."                                  # the Stage 1 ReAct agent
-uv run econ brief                                       # outputs/brief-<date>.md
+uv run macrodesk "Is the yield curve inverted right now?"   # pauses for plan approval
+uv run macrodesk --auto-approve "..."                        # skip the review
+uv run macrodesk --v1 "..."                                  # the Stage 1 ReAct agent
+uv run macrodesk brief                                       # outputs/brief-<date>.md
 uv run pytest                                           # 26 offline tests, no keys needed
 uv run python evals/run_evals.py [--langsmith]          # eval harness
 uv run langgraph dev                                    # LangGraph server + Studio
@@ -168,11 +169,11 @@ SQLite, plus two from wiring the web app. [docs/02-debugging.md](docs/02-debuggi
 
 | Path | What it is |
 |---|---|
-| `src/econ_agent/graph.py`, `nodes.py`, `state.py` | The Stage 2 graph: planner, review, fetch, analyst, critic, finalize |
-| `src/econ_agent/tools.py`, `fred/` | Eight tools over a cached FRED client and a curated series registry |
-| `src/econ_agent/charts.py` | Small-multiple PNG charts for the CLI; JSON payloads for the web |
-| `src/econ_agent/memory.py`, `threads.py` | Store-backed plan memory; thread list, rename, delete |
-| `src/econ_agent/cli.py`, `brief.py` | REPL with checkpoint inspection and time travel; the daily brief |
+| `src/macrodesk/graph.py`, `nodes.py`, `state.py` | The Stage 2 graph: planner, review, fetch, analyst, critic, finalize |
+| `src/macrodesk/tools.py`, `fred/` | Eight tools over a cached FRED client and a curated series registry |
+| `src/macrodesk/charts.py` | Small-multiple PNG charts for the CLI; JSON payloads for the web |
+| `src/macrodesk/memory.py`, `threads.py` | Store-backed plan memory; thread list, rename, delete |
+| `src/macrodesk/cli.py`, `brief.py` | REPL with checkpoint inspection and time travel; the daily brief |
 | `web/` | The research desk: Next.js 16, LangGraph SDK `useStream`, Recharts |
 | `tests/` | 26 offline tests: stub FRED, recorded fixtures, scripted models, SQLite threads |
 | `evals/` | Cases, scorer, LangSmith experiment |

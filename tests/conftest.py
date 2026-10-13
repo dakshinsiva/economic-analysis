@@ -9,8 +9,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from econ_agent import tools
-from econ_agent.fred.client import FredError
+from macrodesk import tools
+from macrodesk.fred.client import FredError
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

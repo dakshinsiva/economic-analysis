@@ -10,9 +10,9 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from econ_agent import nodes
-from econ_agent.graph import build_graph_v2
-from econ_agent.state import Critique, Evidence, Plan, Step
+from macrodesk import nodes
+from macrodesk.graph import build_graph_v2
+from macrodesk.state import Critique, Evidence, Plan, Step
 
 
 class Canned:
@@ -22,6 +22,9 @@ class Canned:
     def invoke(self, prompt):
         self.calls.append(prompt)
         return self.outs.pop(0) if len(self.outs) > 1 else self.outs[0]
+
+    def stream(self, prompt):  # the analyst node streams; yield the canned message as one chunk
+        yield self.invoke(prompt)
 
 
 PLAN = Plan(goal="quits?", steps=[Step(tool="get_series", args={"series_id": "JTSQUR", "last_n": 3}, why="latest")])
@@ -104,7 +107,7 @@ def test_fetch_records_tool_errors_without_crashing(fake_fred):
 
 def test_review_feedback_is_remembered_and_recalled_next_thread(monkeypatch, fake_fred):
     from langgraph.store.memory import InMemoryStore
-    from econ_agent.memory import recall_feedback
+    from macrodesk.memory import recall_feedback
 
     planner = Canned(PLAN)
     _wire(monkeypatch, planner, Canned(AIMessage("ok")), Canned(Critique(approved=True)))

@@ -5,10 +5,10 @@ import "./globals.css";
 const sans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 
-const SITE = "https://econ-agent.vercel.app";
-const TITLE = "econ-agent";
+const SITE = "https://macrodesk-agent.vercel.app";
+const TITLE = "macrodesk";
 const DESCRIPTION =
-  "An agentic research desk over FRED. A LangGraph agent that plans its data retrieval, pauses for your approval, " +
+  "An agentic macro research desk over FRED. A LangGraph agent that plans its data retrieval, pauses for your approval, " +
   "fetches deterministically, cites every figure with series and date, and fact-checks its own draft.";
 
 export const metadata: Metadata = {
@@ -23,13 +23,13 @@ export const metadata: Metadata = {
     type: "website",
     url: SITE,
     siteName: TITLE,
-    title: `${TITLE} — an agentic research desk over FRED`,
+    title: `${TITLE} — an agentic macro research desk over FRED`,
     description: DESCRIPTION,
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: `${TITLE} — an agentic research desk over FRED`,
+    title: `${TITLE} — an agentic macro research desk over FRED`,
     description: DESCRIPTION,
   },
   robots: { index: true, follow: true },

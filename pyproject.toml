@@ -1,5 +1,5 @@
 [project]
-name = "econ-agent"
+name = "macrodesk"
 version = "0.1.0"
 description = "LangGraph agent for economic analysis over the FRED API (JOLTS, GDP, yield curves)."
 requires-python = ">=3.12"
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-econ = "econ_agent.cli:main"
+macrodesk = "macrodesk.cli:main"
 
 [dependency-groups]
 dev = [
@@ -33,7 +33,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/econ_agent"]
+packages = ["src/macrodesk"]
 
 [tool.uv]
 constraint-dependencies = ["cryptography<46"]

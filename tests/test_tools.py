@@ -1,4 +1,4 @@
-from econ_agent.tools import (compare_series, compute_change, get_series, list_known_series,
+from macrodesk.tools import (compare_series, compute_change, get_series, list_known_series,
                               recession_periods, search_fred, yield_curve_snapshot)
 
 
@@ -45,7 +45,7 @@ def test_search_fred_formats_rows(fake_fred):
 
 
 def test_plot_series_writes_png(fake_fred, tmp_path, monkeypatch):
-    from econ_agent import tools
+    from macrodesk import tools
     monkeypatch.setattr(tools, "PROJECT_ROOT", tmp_path)
     out = tools.plot_series.invoke({"series_ids": ["JTSJOL", "JTSQUR", "BOGUS"], "title": "JOLTS test"})
     assert "Chart saved to" in out and "WARNINGS" in out

@@ -1,13 +1,13 @@
 """Terminal REPL for the agent, with built-in debugging commands.
 
-    uv run econ "Is the labor market cooling? Use JOLTS."   # one-shot
-    uv run econ                                               # REPL
-    uv run econ --thread jolts-oct                            # resume (or start) a named thread
-    uv run econ --last                                        # resume the most recent thread
-    uv run econ --user alice                                  # per-user memory namespace
-    uv run econ --v1 "..."                                    # Stage 1 ReAct agent
-    uv run econ --auto-approve "..."                          # skip plan review
-    uv run econ brief                                         # write outputs/brief-<date>.md
+    uv run macrodesk "Is the labor market cooling? Use JOLTS."   # one-shot
+    uv run macrodesk                                               # REPL
+    uv run macrodesk --thread jolts-oct                            # resume (or start) a named thread
+    uv run macrodesk --last                                        # resume the most recent thread
+    uv run macrodesk --user alice                                  # per-user memory namespace
+    uv run macrodesk --v1 "..."                                    # Stage 1 ReAct agent
+    uv run macrodesk --auto-approve "..."                          # skip plan review
+    uv run macrodesk brief                                         # write outputs/brief-<date>.md
 
 Stage 2 graphs pause after planning: press Enter to approve the plan, or type
 feedback (e.g. "use 10 years of history") to re-plan.
@@ -44,12 +44,12 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
-from econ_agent.config import get_settings
-from econ_agent.brief import run_brief
-from econ_agent.graph import build_graph, build_graph_v2
-from econ_agent.memory import forget_all, recall_feedback
-from econ_agent.threads import delete_thread, latest_thread_id, list_threads, rename_thread
-from econ_agent.logging import log_event, setup_logging
+from macrodesk.config import get_settings
+from macrodesk.brief import run_brief
+from macrodesk.graph import build_graph, build_graph_v2
+from macrodesk.memory import forget_all, recall_feedback
+from macrodesk.threads import delete_thread, latest_thread_id, list_threads, rename_thread
+from macrodesk.logging import log_event, setup_logging
 
 console = Console()
 AUTO_APPROVE = False
@@ -176,7 +176,7 @@ def show_threads(graph, saver) -> None:
 
 
 def repl(graph, thread_id: str, store=None, saver=None) -> None:
-    console.print(Panel(f"econ agent - thread [bold]{thread_id}[/]  (type /help)", border_style="blue"))
+    console.print(Panel(f"macrodesk - thread [bold]{thread_id}[/]  (type /help)", border_style="blue"))
     hist: list[Any] = []
     while True:
         try:
@@ -243,7 +243,7 @@ def repl(graph, thread_id: str, store=None, saver=None) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    p = argparse.ArgumentParser(prog="econ", description="FRED economic-analysis agent")
+    p = argparse.ArgumentParser(prog="macrodesk", description="FRED economic-analysis agent")
     p.add_argument("question", nargs="*", help="one-shot question; omit for REPL")
     p.add_argument("--thread", default=None, help="thread name/id to resume or create (default: new random id)")
     p.add_argument("--last", action="store_true", help="resume the most recently updated thread")
@@ -276,7 +276,7 @@ def main(argv: list[str] | None = None) -> None:
         console.print(f"[green]brief written to {path}[/]")
     elif args.question:
         run_turn(graph, thread_id, " ".join(args.question))
-        console.print(f"[dim]thread {thread_id}  -  resume with: uv run econ --thread {thread_id}[/]")
+        console.print(f"[dim]thread {thread_id}  -  resume with: uv run macrodesk --thread {thread_id}[/]")
     else:
         repl(graph, thread_id, store, saver)
 

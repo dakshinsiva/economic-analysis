@@ -54,3 +54,5 @@ body { font-family: var(--font-sans); }
 .prose p { @apply my-2; } .prose code { @apply font-mono text-[13px] bg-line/40 rounded px-1; }
 .prose table { @apply text-sm my-2 border-collapse; } .prose th, .prose td { @apply border border-line px-2 py-1; }
 .prose em { @apply text-muted; }
+.streaming > :last-child::after { content: "▍"; color: var(--color-accent); animation: blink 1s steps(2) infinite; margin-left: 2px; }
+@keyframes blink { 50% { opacity: 0; } }

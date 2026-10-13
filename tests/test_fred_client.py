@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from econ_agent.fred.client import FredClient, FredError
+from macrodesk.fred.client import FredClient, FredError
 
 
 class StubFred:

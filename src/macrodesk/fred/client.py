@@ -24,7 +24,7 @@ from typing import Any
 import pandas as pd
 from fredapi import Fred
 
-from econ_agent.logging import log_event
+from macrodesk.logging import log_event
 
 
 class FredError(RuntimeError):

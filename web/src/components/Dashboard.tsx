@@ -16,10 +16,10 @@ function Spark({ pts, color }: { pts: number[]; color: string }) {
 
 const fmt = (v: number, u: string) => (u === "k" ? Math.round(v).toLocaleString() : v.toFixed(2)) + (u === "k" ? "k" : u === "%" ? "%" : u === "pp" ? " pp" : "");
 
-export function Dashboard({ mode, onAsk }: { mode: "live" | "demo"; onAsk: (q: string) => void }) {
+export function Dashboard({ mode, onAsk, open, onToggle }:
+  { mode: "live" | "demo"; onAsk: (q: string) => void; open: boolean; onToggle: () => void }) {
   type Snap = { asOf: string; indicators: Indicator[]; recorded?: boolean };
   const [data, setData] = useState<Snap | null>(mode === "demo" ? { ...(demo as Snap), recorded: true } : null);
-  const [open, setOpen] = useState(true);
   useEffect(() => {
     if (mode === "demo") return;
     let alive = true;
@@ -31,7 +31,7 @@ export function Dashboard({ mode, onAsk }: { mode: "live" | "demo"; onAsk: (q: s
   return (
     <section className="border-b border-line px-5 py-2">
       <div className="flex items-center gap-2 text-xs text-muted">
-        <button className="hover:text-fg" onClick={() => setOpen((o) => !o)}>{open ? "▾" : "▸"} Macro dashboard</button>
+        <button className="hover:text-fg" onClick={onToggle}>{open ? "▾" : "▸"} Macro dashboard</button>
         <span>· as of {data.asOf.slice(0, 10)}{data.recorded ? " (recorded snapshot)" : " (live FRED)"} · click a tile to ask about it</span>
       </div>
       {open && (

@@ -26,10 +26,10 @@ from langgraph.store.memory import InMemoryStore
 from langgraph.types import Command
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from econ_agent import nodes  # noqa: E402
-from econ_agent.config import get_settings  # noqa: E402
-from econ_agent.graph import build_graph_v2  # noqa: E402
-from econ_agent.logging import setup_logging  # noqa: E402
+from macrodesk import nodes  # noqa: E402
+from macrodesk.config import get_settings  # noqa: E402
+from macrodesk.graph import build_graph_v2  # noqa: E402
+from macrodesk.logging import setup_logging  # noqa: E402
 
 CASES = Path(__file__).parent / "cases.yaml"
 
@@ -91,7 +91,7 @@ def main() -> None:
         from langsmith import Client, evaluate
 
         client = Client()
-        name = "econ-agent-cases"
+        name = "macrodesk-cases"
         ds = next(iter(client.list_datasets(dataset_name=name)), None) or client.create_dataset(name)
         existing = {e.inputs["question"] for e in client.list_examples(dataset_id=ds.id)}
         new = [c for c in cases if c["question"] not in existing]
@@ -112,7 +112,7 @@ def main() -> None:
             return _e
 
         evaluate(target, data=name, evaluators=[make_eval(k) for k in keys],
-                 experiment_prefix="econ-agent-v2", max_concurrency=1)
+                 experiment_prefix="macrodesk-v2", max_concurrency=1)
 
 
 if __name__ == "__main__":

@@ -3,8 +3,8 @@
     "."
   ],
   "graphs": {
-    "econ_agent": "./src/econ_agent/graph.py:graph",
-    "econ_agent_v2": "./src/econ_agent/graph.py:graph_v2"
+    "macrodesk": "./src/macrodesk/graph.py:graph_v2",
+    "macrodesk_v1": "./src/macrodesk/graph.py:graph"
   },
   "env": ".env"
 }

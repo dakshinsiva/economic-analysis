@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useStream } from "@langchain/langgraph-sdk/react";
 import type { Thread } from "@langchain/langgraph-sdk";
@@ -18,8 +18,8 @@ import { EXAMPLES, type AgentState, type NodeName, type PlanReviewInterrupt, tex
 
 type Mode = "checking" | "live" | "demo";
 
-export const APP_NAME = "econ-agent";
-export const APP_TAGLINE = "agentic research desk over FRED: planned retrieval, human review, cited and fact-checked answers";
+export const APP_NAME = "macrodesk";
+export const APP_TAGLINE = "an agentic macro research desk over FRED";
 
 async function detectMode(): Promise<Mode> {
   const forced = new URLSearchParams(window.location.search).get("demo") === "1" || process.env.NEXT_PUBLIC_DEMO === "1";
@@ -49,21 +49,35 @@ function Live() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [prefs, setPrefs] = useState<Pref[]>([]);
   const [timings, setTimings] = useState<NodeTiming[]>([]);
+  const [dashOpen, setDashOpen] = useState(true);
 
   const stream = useStream<AgentState, { InterruptType: PlanReviewInterrupt }>({
     // The SDK builds absolute URLs, so a relative base is rejected ("Invalid URL").
     apiUrl: `${window.location.origin}/api`,
-    assistantId: "econ_agent_v2",
+    assistantId: "macrodesk",
     threadId,
     onThreadId: setThreadId,
     onUpdateEvent: (data) => {
-      const nodes = Object.keys(data).filter((k) => k !== "__interrupt__") as NodeName[];
+      // An update means node `n` finished; the next node is now running.
       const now = Date.now();
-      for (const n of nodes) {
-        setDone((d) => (d.includes(n) ? d : [...d, n]));
-        setActive(n === "finalize" ? null : n);
+      const d = data as Record<string, Partial<AgentState> | undefined>;
+      for (const n of Object.keys(d).filter((k) => k !== "__interrupt__") as NodeName[]) {
+        setDone((prev) => (prev.includes(n) ? prev : [...prev, n]));
         setTimings((t) => [...t, { node: n, at: now }]);
+        const next: NodeName | null =
+          n === "planner" ? "review"
+          : n === "review" ? (d.review?.plan_feedback ? "planner" : "fetch")
+          : n === "fetch" ? "analyst"
+          : n === "analyst" ? "critic"
+          : n === "critic" ? (d.critic?.critique?.approved ? "finalize" : "analyst")
+          : null;
+        setActive(next);
       }
+    },
+    onCustomEvent: (ev, { mutate }) => {
+      const e = ev as { draft_delta?: string; draft_reset?: boolean };
+      if (e.draft_reset) mutate({ draft: "" });
+      if (e.draft_delta) mutate((prev) => ({ draft: (prev.draft ?? "") + e.draft_delta }));
     },
     onFinish: () => setActive(null),
     onError: () => setActive(null),
@@ -87,7 +101,7 @@ function Live() {
   const shownActive: NodeName | null = interrupt ? "review" : active;
 
   const ask = (q: string) => {
-    setDone([]); setActive("planner"); setTimings([{ node: "submitted", at: Date.now() }]);
+    setDone([]); setActive("planner"); setTimings([{ node: "submitted", at: Date.now() }]); setDashOpen(false);
     stream.submit({ messages: [{ type: "human", content: q }] }, { config: { configurable: { user_id: "default" } } });
   };
   const decide = (d: string) => {
@@ -100,7 +114,7 @@ function Live() {
     <Shell mode="live" sidebar={<Sidebar mode="live" threads={threads} currentId={threadId} prefs={prefs}
       onPick={(id) => { setThreadId(id); setDone(["planner", "review", "fetch", "analyst", "critic", "finalize"]); setActive(null); setTimings([]); }}
       onNew={() => { setThreadId(null); setDone([]); setActive(null); setTimings([]); }} />}>
-      <Dashboard mode="live" onAsk={ask} />
+      <Dashboard mode="live" onAsk={ask} open={dashOpen} onToggle={() => setDashOpen((o) => !o)} />
       <Run values={stream.values} active={shownActive} done={done} interrupt={interrupt} isLoading={stream.isLoading}
         error={stream.error ? String(stream.error) : null} onDecide={decide} onAsk={ask} onStop={() => stream.stop()} timings={timings} />
     </Shell>
@@ -110,16 +124,66 @@ function Live() {
 /* ------------------------------------------------------------------ demo */
 function Demo() {
   const d = useDemo();
+  const [notice, setNotice] = useState<string | null>(null);
+  // ?autoplay=0 keeps the landing state (used for screenshots and by the curious).
+  // Demo only mounts in the browser, so reading the URL in the initializer is safe.
+  const [autoplay, setAutoplay] = useState(() => new URLSearchParams(window.location.search).get("autoplay") !== "0");
+  const [dashOpen, setDashOpen] = useState(true);
+  const started = d.values.messages.length > 0;
+  // Start the replay on arrival so the page shows the whole pipeline without a click.
+  useEffect(() => {
+    if (!autoplay) return;
+    const id = setTimeout(() => d.start(), 900);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const decide = (x: string) => {
+    if (x !== "approve") {
+      setNotice("Recorded run: with a backend attached the planner would re-plan from this feedback and remember it for next time. Continuing with the recorded plan.");
+      setTimeout(() => setNotice(null), 6000);
+    }
+    d.resume("approve");
+  };
   return (
-    <Shell mode="demo" sidebar={<Sidebar mode="demo" threads={[]} currentId={null} prefs={[]} onPick={() => {}} onNew={d.reset} />}>
-      <Dashboard mode="demo" onAsk={() => d.start()} />
+    <Shell mode="demo" sidebar={<Sidebar mode="demo" threads={[]} currentId={null} prefs={[]} onPick={() => {}} onNew={() => { setAutoplay(false); d.reset(); }} />}>
+      <Dashboard mode="demo" onAsk={() => { setAutoplay(false); d.reset(); setTimeout(() => d.start(), 50); }}
+        open={dashOpen && !started} onToggle={() => setDashOpen((o) => !o)} />
+      {notice && <div className="mx-5 mt-3 rounded-md border border-plan/40 bg-plan/10 px-3 py-2 text-sm">{notice}</div>}
       <Run values={d.values} active={d.active} done={d.done} interrupt={d.interrupt} isLoading={d.isLoading} error={null}
-        onDecide={d.resume} onAsk={() => d.start()} onStop={d.reset} demoQuestion={d.question} timings={d.timings} />
+        onDecide={decide} onAsk={() => { setAutoplay(false); d.reset(); setTimeout(() => d.start(), 50); }} onStop={d.reset}
+        demoQuestion={d.question} timings={d.timings} autoApproveIn={autoplay ? 6 : undefined} />
     </Shell>
   );
 }
 
 /* ------------------------------------------------------------------ shared */
+function HowItWorks() {
+  const items: [string, string][] = [
+    ["Plan is data", "The planner emits a structured list of FRED tool calls. You approve or edit it before anything runs, and what you say is remembered for next time."],
+    ["Fetch has no model", "An approved plan is executed deterministically against FRED through a cached client. It cannot hallucinate; errors become evidence, not crashes."],
+    ["Critic, not vibes", "A regex check proves every (SERIES_ID, date) exists in the evidence; an LLM pass flags uncited numbers. Rejected drafts go back to the analyst, at most twice."],
+  ];
+  return (
+    <section className="pt-6 pb-4 border-t border-line mt-6">
+      <div className="text-xs text-muted mb-3">How it works · LangGraph StateGraph · planner → review → fetch → analyst → critic → finalize</div>
+      <div className="grid sm:grid-cols-3 gap-3">
+        {items.map(([h, b]) => (
+          <div key={h} className="rounded-md border border-line p-3">
+            <div className="text-sm font-semibold mb-1">{h}</div>
+            <div className="text-xs text-muted leading-relaxed">{b}</div>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted mt-4">
+        <a className="hover:text-fg" href="https://github.com/dakshinsiva/macrodesk" target="_blank" rel="noreferrer">Source on GitHub</a>
+        <a className="hover:text-fg" href="https://github.com/dakshinsiva/macrodesk/blob/main/docs/02-debugging.md" target="_blank" rel="noreferrer">Debugging log (15 incidents)</a>
+        <a className="hover:text-fg" href="https://fred.stlouisfed.org" target="_blank" rel="noreferrer">Data: FRED, St. Louis Fed</a>
+        <span>Built with LangGraph, Claude, Next.js</span>
+      </div>
+    </section>
+  );
+}
+
 function Shell({ mode, sidebar, children }: { mode: "live" | "demo"; sidebar: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex h-dvh">
@@ -132,7 +196,7 @@ function Shell({ mode, sidebar, children }: { mode: "live" | "demo"; sidebar: Re
           <span className={`ml-auto tag ${mode === "live" ? "bg-ok/15 text-ok" : "bg-plan/15 text-plan"}`}>
             {mode === "live" ? "live backend" : "demo replay"}
           </span>
-          <a className="text-sm text-muted hover:text-fg" href="https://github.com/dakshinsiva/economic-analysis" target="_blank" rel="noreferrer">GitHub ↗</a>
+          <a className="text-sm text-muted hover:text-fg" href="https://github.com/dakshinsiva/macrodesk" target="_blank" rel="noreferrer">GitHub ↗</a>
         </header>
         {children}
       </div>
@@ -140,10 +204,10 @@ function Shell({ mode, sidebar, children }: { mode: "live" | "demo"; sidebar: Re
   );
 }
 
-function Run({ values, active, done, interrupt, isLoading, error, onDecide, onAsk, onStop, demoQuestion, timings }: {
+function Run({ values, active, done, interrupt, isLoading, error, onDecide, onAsk, onStop, demoQuestion, timings, autoApproveIn }: {
   values: AgentState; active: NodeName | null; done: NodeName[]; interrupt: PlanReviewInterrupt | null; isLoading: boolean;
   error: string | null; onDecide: (d: string) => void; onAsk: (q: string) => void; onStop: () => void; demoQuestion?: string;
-  timings: NodeTiming[];
+  timings: NodeTiming[]; autoApproveIn?: number;
 }) {
   const [q, setQ] = useState("");
   const msgs = useMemo(() => values.messages ?? [], [values.messages]);
@@ -151,6 +215,31 @@ function Run({ values, active, done, interrupt, isLoading, error, onDecide, onAs
   const lastAi = useMemo(() => [...msgs].reverse().find((m) => m.type === "ai"), [msgs]);
   const finalReady = done.includes("finalize") && lastAi;
   const empty = !lastHuman && !isLoading;
+  const runKey = lastHuman ? textOf(lastHuman) + (values.plan?.goal ?? "") : "";
+
+  // Follow-scroll: keep the newest content in view while a run streams, but
+  // stop the moment the reader scrolls up; a button brings them back.
+  // The anchor sits right after the last run card (before the explainer strip), so
+  // following keeps the newest card in view rather than racing to the page bottom.
+  const scroller = useRef<HTMLElement>(null);
+  const anchor = useRef<HTMLDivElement>(null);
+  const [following, setFollowing] = useState(true);
+  const followRef = useRef(true);
+  const setFollow = (v: boolean) => { followRef.current = v; setFollowing(v); };
+  const anchorVisible = () => {
+    const el = scroller.current, an = anchor.current;
+    if (!el || !an) return true;
+    return an.getBoundingClientRect().top <= el.getBoundingClientRect().bottom + 24;
+  };
+  const scrollToAnchor = () => anchor.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+  const contentSig = `${values.plan?.goal}|${values.evidence?.length}|${values.charts?.length}|${Math.floor((values.draft?.length ?? 0) / 80)}|${values.critique?.approved}|${msgs.length}|${active}|${interrupt ? 1 : 0}`;
+  useEffect(() => {
+    if (followRef.current) scrollToAnchor();
+  }, [contentSig]);
+  const onScroll = () => { if (!followRef.current && anchorVisible()) setFollow(true); };
+  const onWheel = (e: React.WheelEvent) => { if (e.deltaY < 0 && followRef.current) setFollow(false); };
+  const onTouchMove = () => { if (followRef.current) setFollow(false); };
+  const jump = () => { setFollow(true); scrollToAnchor(); };
 
   return (
     <>
@@ -158,7 +247,9 @@ function Run({ values, active, done, interrupt, isLoading, error, onDecide, onAs
         <Pipeline active={active} done={done} />
         {isLoading && <button className="btn text-xs" onClick={onStop}>stop</button>}
       </div>
-      <main className="flex-1 overflow-y-auto px-5 py-4 space-y-4 max-w-4xl w-full mx-auto">
+      <main ref={scroller} onScroll={onScroll} onWheel={onWheel} onTouchMove={onTouchMove}
+        className="relative flex-1 overflow-y-auto px-5 py-4 space-y-4 w-full scroll-smooth">
+       <div className="max-w-4xl mx-auto space-y-4">
         {empty && (
           <div className="py-10">
             <h2 className="text-xl font-semibold mb-2">Research desk</h2>
@@ -172,15 +263,29 @@ function Run({ values, active, done, interrupt, isLoading, error, onDecide, onAs
         )}
         {lastHuman && <div className="text-sm"><span className="tag bg-line/60 text-fg mr-2">you</span>{textOf(lastHuman)}</div>}
         {error && <div className="card border-l-4 border-l-bad p-3 text-sm text-bad">{error}</div>}
-        {values.plan && <PlanCard plan={values.plan} awaiting={!!interrupt} onDecide={onDecide} />}
-        {!!values.evidence?.length && <EvidenceList evidence={values.evidence} />}
+        {values.plan && <PlanCard key={"plan" + runKey} plan={values.plan} awaiting={!!interrupt} onDecide={onDecide} autoApproveIn={autoApproveIn}
+          collapsed={done.includes("fetch")} />}
+        {!!values.evidence?.length && <EvidenceList key={"ev" + runKey} evidence={values.evidence} collapsed={!!values.draft || !!finalReady} />}
         {values.charts?.map((c, i) => <ChartCard key={i} chart={c} />)}
-        {values.draft && !finalReady && <Answer text={values.draft} draft />}
+        {values.draft && !finalReady && <Answer text={values.draft} draft streaming={active === "analyst"} />}
         {values.critique && <CriticCard critique={values.critique} revisions={values.revisions} />}
         {finalReady && <Answer text={textOf(lastAi!)} onFollowUp={demoQuestion ? undefined : onAsk}
           followUps={followUps(textOf(lastAi!), lastHuman ? textOf(lastHuman) : "")} />}
         {finalReady && <Trace timings={timings} values={values} />}
+        <div ref={anchor} aria-hidden className="h-px" />
         {isLoading && !interrupt && <div className="text-xs text-muted animate-pulse">running {active ?? "…"}</div>}
+        {finalReady && demoQuestion && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted pt-2">
+            <span>That was a recorded run.</span>
+            <button className="btn" onClick={() => onAsk(demoQuestion)}>Replay</button>
+            <a className="btn" href="https://github.com/dakshinsiva/macrodesk#running-it" target="_blank" rel="noreferrer">Run it live with your own FRED key ↗</a>
+          </div>
+        )}
+        <HowItWorks />
+       </div>
+        {!following && (isLoading || !!interrupt) && (
+          <button onClick={jump} className="sticky bottom-3 left-1/2 -translate-x-1/2 btn-primary shadow-lg text-xs">↓ jump to latest</button>
+        )}
       </main>
       {!demoQuestion && (
         <form className="border-t border-line px-5 py-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (q.trim()) { onAsk(q.trim()); setQ(""); } }}>

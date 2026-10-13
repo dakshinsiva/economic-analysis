@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from langchain_anthropic import ChatAnthropic
 
-from econ_agent.config import get_settings
+from macrodesk.config import get_settings
 
 
 def make_model() -> ChatAnthropic:

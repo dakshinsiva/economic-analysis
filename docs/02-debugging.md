@@ -6,9 +6,9 @@ interview stories.
 ## 1. `uv add` failed: hatch could not find the package
 **Symptom.** `uv add ...` printed a hatch hint about `packages = ["src/foo"]` and
 nothing installed.
-**Cause.** I deleted `src/econ_agent` after `uv init --lib`, so the build backend
+**Cause.** I deleted `src/macrodesk` after `uv init --lib`, so the build backend
 had nothing to build when resolving the project itself.
-**Fix.** Explicit `[tool.hatch.build.targets.wheel] packages = ["src/econ_agent"]`
+**Fix.** Explicit `[tool.hatch.build.targets.wheel] packages = ["src/macrodesk"]`
 and recreate the package dir before syncing.
 **Lesson.** uv builds *your* project during sync; an unbuildable project blocks
 every dependency.
@@ -66,7 +66,7 @@ change needed; a planner node in Stage 2 will validate input explicitly.
 tells you what it sent before the server tells you why it refused.
 
 ## 7. Circular import between graph.py and nodes.py
-**Symptom.** `AttributeError: partially initialized module 'econ_agent.nodes' has no attribute 'planner'`
+**Symptom.** `AttributeError: partially initialized module 'macrodesk.nodes' has no attribute 'planner'`
 at test collection, right after adding Stage 2.
 **Cause.** `graph.py` imports `nodes` to build the graph; `nodes.py` imported
 `make_model` from `graph.py`. Python executes `graph.py` top to bottom, hits
@@ -84,7 +84,7 @@ human turn. Exactly the shape I had documented two hours earlier.
 **Lesson.** Write a test that exercises the real prompt shape against a model
 stub that *validates* message roles, not just one that returns canned output.
 
-## 9. "Deserializing unregistered type econ_agent.state.Plan from checkpoint"
+## 9. "Deserializing unregistered type macrodesk.state.Plan from checkpoint"
 **Symptom.** Warning on every `get_state` once Stage 2 stored Pydantic objects
 in graph state; LangGraph says this will become an error.
 **Cause.** The checkpointer serialises state with msgpack and only round-trips

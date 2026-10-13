@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "econ-agent: an agentic research desk over FRED";
+export const alt = "macrodesk: an agentic macro research desk over FRED";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -24,10 +24,10 @@ export default function OpenGraphImage() {
               <circle cx="55" cy="18" r="4.5" fill="#5598e7" stroke="#22242a" strokeWidth="2.5" />
               <path d="M12 50h40" stroke="#3fc27a" strokeWidth="3" strokeLinecap="round" />
             </svg>
-            <div style={{ fontSize: 56, fontWeight: 700, letterSpacing: -1 }}>econ-agent</div>
+            <div style={{ fontSize: 56, fontWeight: 700, letterSpacing: -1 }}>macrodesk</div>
           </div>
           <div style={{ fontSize: 30, marginTop: 28, lineHeight: 1.3, color: "#c9c8c0" }}>
-            An agentic research desk over FRED. Plans its retrieval, waits for your approval, cites every figure, and fact-checks its own draft.
+            An agentic macro research desk over FRED. Plans its retrieval, waits for your approval, cites every figure, and fact-checks its own draft.
           </div>
           <div style={{ display: "flex", gap: 7, marginTop: 36, fontSize: 17 }}>
             {["plan", "review", "fetch", "write", "check", "answer"].map((n, i) => (

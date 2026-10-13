@@ -18,10 +18,10 @@ from typing import Optional
 import pandas as pd
 from langchain_core.tools import tool
 
-from econ_agent.charts import chart_payload, plot_small_multiples
-from econ_agent.config import PROJECT_ROOT, get_settings
-from econ_agent.fred.client import FredClient, FredError
-from econ_agent.fred.series import REGISTRY, TOPICS, by_topic
+from macrodesk.charts import chart_payload, plot_small_multiples
+from macrodesk.config import PROJECT_ROOT, get_settings
+from macrodesk.fred.client import FredClient, FredError
+from macrodesk.fred.series import REGISTRY, TOPICS, by_topic
 
 
 @lru_cache(maxsize=1)

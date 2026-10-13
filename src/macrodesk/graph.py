@@ -13,8 +13,8 @@ from __future__ import annotations
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.store.base import BaseStore
 
-from econ_agent.models import make_model
-from econ_agent.tools import ALL_TOOLS
+from macrodesk.models import make_model
+from macrodesk.tools import ALL_TOOLS
 
 SYSTEM_PROMPT = """You are an economic analyst assistant with live access to FRED (Federal Reserve Economic Data).
 
@@ -39,7 +39,7 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None):
         tools=ALL_TOOLS,
         system_prompt=SYSTEM_PROMPT,
         checkpointer=checkpointer,
-        name="econ_agent",
+        name="macrodesk_v1",
     )
 
 
@@ -53,8 +53,8 @@ graph = build_graph()
 def build_graph_v2(checkpointer: BaseCheckpointSaver | None = None, store: BaseStore | None = None):
     from langgraph.graph import END, START, StateGraph
 
-    from econ_agent import nodes
-    from econ_agent.state import AgentState
+    from macrodesk import nodes
+    from macrodesk.state import AgentState
 
     g = StateGraph(AgentState)
     g.add_node("planner", nodes.planner)
@@ -71,7 +71,7 @@ def build_graph_v2(checkpointer: BaseCheckpointSaver | None = None, store: BaseS
     g.add_edge("analyst", "critic")
     g.add_conditional_edges("critic", nodes.route_after_critic, {"analyst": "analyst", "finalize": "finalize"})
     g.add_edge("finalize", END)
-    return g.compile(checkpointer=checkpointer, store=store, name="econ_agent_v2")
+    return g.compile(checkpointer=checkpointer, store=store, name="macrodesk")
 
 
 graph_v2 = build_graph_v2()

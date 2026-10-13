@@ -13,7 +13,12 @@ export function Sidebar({ threads, currentId, onPick, onNew, prefs, mode }:
           <button className="btn text-xs" onClick={onNew}>new</button>
         </div>
         {mode === "demo" ? (
-          <p className="text-muted text-xs">Threads persist in the LangGraph checkpointer when a backend is attached.</p>
+          <>
+            <ul className="space-y-1 text-xs">
+              <li className="rounded bg-line/60 px-2 py-1.5">Latest JOLTS report (recorded)</li>
+            </ul>
+            <p className="text-muted text-xs mt-2">With a backend attached, every conversation is a LangGraph thread you can resume, replay or fork.</p>
+          </>
         ) : threads.length === 0 ? (
           <p className="text-muted text-xs">No threads yet.</p>
         ) : (

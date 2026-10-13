@@ -47,8 +47,14 @@ export function useDemo() {
       await wait(700);
       setValues((v) => ({ ...v, evidence: ev.slice(0, i + 1), charts: i === ev.length - 1 ? DEMO.charts : v.charts }));
     }
-    mark("fetch"); setDone(["planner", "review", "fetch"]); setActive("analyst"); await wait(1800); mark("analyst");
-    setValues((v) => ({ ...v, draft: DEMO.draft }));
+    mark("fetch"); setDone(["planner", "review", "fetch"]); setActive("analyst");
+    // Type the draft out in word-sized chunks, as the live analyst streams tokens.
+    const words = (DEMO.draft ?? "").split(/(\s+)/);
+    for (let i = 0; i < words.length; i += 3) {
+      setValues((v) => ({ ...v, draft: words.slice(0, i + 3).join("") }));
+      await wait(28);
+    }
+    setValues((v) => ({ ...v, draft: DEMO.draft })); mark("analyst");
     setDone(["planner", "review", "fetch", "analyst"]); setActive("critic"); await wait(1500); mark("critic");
     setValues((v) => ({ ...v, critique: DEMO.critique, revisions: DEMO.revisions }));
     setDone(["planner", "review", "fetch", "analyst", "critic"]); setActive("finalize"); await wait(500); mark("finalize");

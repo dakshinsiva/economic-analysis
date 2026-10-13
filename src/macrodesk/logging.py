@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-_LOGGER_NAME = "econ_agent"
+_LOGGER_NAME = "macrodesk"
 
 
 class JsonLineFormatter(logging.Formatter):
@@ -35,7 +35,7 @@ class JsonLineFormatter(logging.Formatter):
 
 
 def setup_logging(log_dir: Path, thread_id: str, level: str = "INFO") -> logging.Logger:
-    """Configure the econ_agent logger to write JSONL for this thread."""
+    """Configure the macrodesk logger to write JSONL for this thread."""
     logger = logging.getLogger(_LOGGER_NAME)
     logger.setLevel(level.upper())
     # Avoid duplicate handlers when called twice in the same process (tests, REPL).

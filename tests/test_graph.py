@@ -13,7 +13,7 @@ from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
-from econ_agent import graph as graph_mod
+from macrodesk import graph as graph_mod
 
 
 class ScriptedModel(GenericFakeChatModel):
