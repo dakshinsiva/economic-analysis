@@ -185,6 +185,49 @@ before building the connection yourself: the arguments it chooses are the
 contract. And a fix verified only against existing state is half verified;
 test on an empty one too.
 
+## 17. The planner emitted a step with no arguments
+**Symptom.** On a follow-up question the plan was `compare_to_prepandemic({})`.
+Fetch recorded a tool error as evidence, and the run went on to the analyst.
+**Cause.** Structured output guarantees the *shape* of `Plan` (a list of steps
+with a tool name and an args dict), not that the args satisfy the tool. Nothing
+checked them before execution.
+**Fix.** `_validate_steps` runs each step's args through the tool's own
+`args_schema`; on failure the planner is called once more with the error text,
+and steps that are still invalid are dropped rather than run.
+**Lesson.** A schema for the container is not a schema for the contents.
+Validate at the boundary where the real schema lives, which is the tool.
+
+## 18. The analyst quoted the previous answer instead of evidence
+**Symptom.** Same run as note 17: with only an error in the evidence block, the
+draft stated three GDP figures with citations. They came from the earlier
+answer in the thread, which I had just started passing to the analyst as
+context. The critic rejected the draft twice and the answer shipped with the
+reviewer note.
+**Cause.** Conversation context and evidence were different things to me and
+the same thing to the model. Anything in the prompt is fair game to cite.
+**Fix.** Earlier turns' *evidence* (not their prose) is carried in state as
+`prior_evidence`, shown to the analyst as evidence and included in the critic's
+checks. The planner is told it exists, so follow-ups plan less and cite more.
+**Lesson.** If you want the model to reuse something, give it the thing you
+want cited, in the form you check. The critic doing its job is what made this
+visible; without it the run would have looked fine.
+
+## 19. The number whitelist leaked
+**Symptom.** The new deterministic number check let "its 3.0% peak in late
+2021" through with no 3.0 anywhere in the evidence.
+**Cause.** Two leaks. Registry notes such as "3mo avg" and "12-month low" fed a
+whitelist of "numbers the model may repeat", so 3 and 12 were always allowed.
+And the scaled match divided 3.0 by 1,000 and landed within the absolute
+tolerance of a *zero* difference produced by two identical evidence values.
+**How found.** `evals/run_critic_evals.py` on labelled drafts, then a ten-line
+trace of the one case. Precision stayed 1.0 throughout; recall went from 0.8
+to 1.0 after the fix.
+**Fix.** Whitelist only the question's numbers plus four named constants; drop
+zero differences; apply scaling only above a magnitude.
+**Lesson.** A check with a tolerance needs a labelled set on both sides. False
+positives are visible immediately (they block answers); false negatives are
+invisible until you measure them.
+
 ## Toolkit cheat-sheet
 
 | Question | Tool |

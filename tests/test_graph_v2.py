@@ -130,3 +130,85 @@ def test_fetch_adds_chart_payload_for_plot_steps(fake_fred):
     assert out["evidence"][0]["ok"]
     assert out["charts"][0]["panels"][0]["id"] == "JTSQUR"
     assert out["charts"][0]["panels"][0]["points"][-1]["d"] == "2026-08-01"
+
+
+# ---------------------------------------------------------------- numeric grounding
+def _ev(text):
+    return [Evidence(tool="get_series", args={}, result=text, ok=True).model_dump()]
+
+
+def test_numeric_check_passes_evidence_numbers_scales_and_derivations():
+    ev = _ev("JTSJOL [Thousands, SA]\n2025-08-01  6,919.00\n2026-08-01  7,079.00\nmax 12,301.00 min 6,550.00")
+    draft = ("Openings were 7,079 thousand (about 7.1 million) in August 2026, up 160 from a year earlier (+2.3%), "
+             "a decline of 529,000 since the 6,550 low in reverse, and 42% below the 12,301 peak; "
+             "5 of the 6 readings were above 7,000.")
+    assert nodes._numeric_checks(draft, ev) == []
+
+
+def test_numeric_check_flags_unsupported_number_and_unit_error():
+    ev = _ev("JTSJOL [Thousands, SA]\n2026-08-01  7,079.00\nmean 7,437.97")
+    issues = nodes._numeric_checks("The mean is 7,437,970 thousand and openings peaked near 12 million in 2022.", ev)
+    assert any("Unit error" in i for i in issues)
+    assert any("12 million" in i or "number 12" in i for i in issues)
+
+
+def test_numeric_check_allows_numbers_from_the_question():
+    ev = _ev("PCEPILFE yoy 3.01")
+    assert nodes._numeric_checks("Core PCE is 3.01%, above the 2% target.", ev, question="Is core PCE above the 2% target?") == []
+
+
+def test_numeric_check_catches_critic_bounce_end_to_end(monkeypatch, fake_fred):
+    analyst = Canned(AIMessage("Quits rate is 1.9% (JTSQUR, 2026-08-01); openings peaked at 12,301 thousand."),
+                     AIMessage("Quits rate is 1.9% (JTSQUR, 2026-08-01)."))
+    _wire(monkeypatch, Canned(PLAN), analyst, Canned(Critique(approved=True)))
+    g = build_graph_v2(InMemorySaver())
+    g.invoke({"messages": [HumanMessage("quits?")]}, CFG)
+    out = g.invoke(Command(resume="approve"), CFG)
+    assert out["revisions"] == 2 and out["critique"]["approved"]  # deterministic check bounced the first draft
+
+
+# ---------------------------------------------------------------- editable plan, concurrency, thread context
+def test_review_accepts_an_edited_plan(monkeypatch, fake_fred):
+    _wire(monkeypatch, Canned(PLAN), Canned(AIMessage("ok (JTSQUR, 2026-08-01)")), Canned(Critique(approved=True)))
+    g = build_graph_v2(InMemorySaver())
+    g.invoke({"messages": [HumanMessage("q")]}, CFG)
+    edited = Plan(goal="edited", steps=[Step(tool="get_series", args={"series_id": "JTSQUR", "start": "2021-01-01"}, why="w")])
+    out = g.invoke(Command(resume={"plan": edited.model_dump()}), CFG)
+    assert out["plan"]["goal"] == "edited" and fake_fred.calls[0][2] == "2021-01-01"
+
+
+def test_fetch_runs_steps_concurrently_in_plan_order(fake_fred):
+    plan = Plan(goal="g", steps=[Step(tool="get_series", args={"series_id": s}, why="w") for s in ("JTSJOL", "BOGUS", "JTSQUR", "UNRATE")])
+    out = nodes.fetch({"plan": plan.model_dump()})
+    assert [e["args"]["series_id"] for e in out["evidence"]] == ["JTSJOL", "BOGUS", "JTSQUR", "UNRATE"]
+    assert [e["ok"] for e in out["evidence"]] == [True, False, True, True]
+
+
+def test_planner_sees_earlier_turns(monkeypatch, fake_fred):
+    planner = Canned(PLAN)
+    _wire(monkeypatch, planner, Canned(AIMessage("first answer")), Canned(Critique(approved=True)))
+    g = build_graph_v2(InMemorySaver())
+    g.invoke({"messages": [HumanMessage("first question")]}, CFG); g.invoke(Command(resume="approve"), CFG)
+    g.invoke({"messages": [HumanMessage("and compared with 2019?")]}, CFG)
+    system = str(planner.calls[-1][0].content)
+    assert "Earlier in this conversation" in system and "first question" in system and "first answer" in system
+
+
+def test_planner_retries_when_step_args_are_invalid(monkeypatch, fake_fred):
+    bad = Plan(goal="g", steps=[Step(tool="compare_to_prepandemic", args={}, why="missing series")])
+    good = Plan(goal="g", steps=[Step(tool="compare_to_prepandemic", args={"series_id": "JTSQUR"}, why="fixed")])
+    planner = Canned(bad, good)
+    _wire(monkeypatch, planner, Canned(AIMessage("ok")), Canned(Critique(approved=True)))
+    g = build_graph_v2(InMemorySaver())
+    out = g.invoke({"messages": [HumanMessage("q")]}, CFG)
+    assert out["plan"]["steps"][0]["args"] == {"series_id": "JTSQUR"}
+    assert "invalid arguments" in str(planner.calls[1][-1].content)
+
+
+def test_prior_evidence_carries_into_follow_up(monkeypatch, fake_fred):
+    _wire(monkeypatch, Canned(PLAN), Canned(AIMessage("Quits 1.9% (JTSQUR, 2026-08-01).")), Canned(Critique(approved=True)))
+    g = build_graph_v2(InMemorySaver())
+    g.invoke({"messages": [HumanMessage("quits?")]}, CFG); g.invoke(Command(resume="approve"), CFG)
+    follow = g.invoke({"messages": [HumanMessage("and vs last year?")]}, CFG)
+    assert follow["evidence"] == [] and follow["prior_evidence"][0]["prior"] and follow["prior_evidence"][0]["tool"] == "get_series"
+    assert "JTSQUR" in nodes._format_evidence(nodes._all_evidence(follow))

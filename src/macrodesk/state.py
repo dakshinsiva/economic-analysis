@@ -20,6 +20,9 @@ from typing_extensions import TypedDict
 ToolName = Literal[
     "list_known_series", "search_fred", "get_series", "compute_change",
     "compare_series", "yield_curve_snapshot", "recession_periods", "plot_series",
+    "series_as_of", "revision_history", "release_calendar",
+    "extremes", "percentile_rank", "compare_to_prepandemic", "sahm_rule", "recession_probability", "correlate",
+    "macro_snapshot",
 ]
 
 
@@ -57,6 +60,7 @@ class AgentState(TypedDict, total=False):
     plan: dict[str, Any] | None
     plan_feedback: str | None       # set by review when the human asks for changes
     evidence: list[dict[str, Any]]
+    prior_evidence: list[dict[str, Any]]   # evidence from earlier questions in this thread (marked prior=True)
     draft: str
     critique: dict[str, Any] | None
     revisions: int

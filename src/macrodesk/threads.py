@@ -66,8 +66,8 @@ def rename_thread(saver: BaseCheckpointSaver, old: str, new: str) -> None:
     UPDATE is safe. Other savers are refused rather than half-renamed.
     """
     conn = getattr(saver, "conn", None)
-    if conn is None or not hasattr(conn, "execute"):
-        raise NotImplementedError(f"{type(saver).__name__} cannot rename threads")
+    if conn is None or not hasattr(conn, "execute") or type(saver).__name__ != "SqliteSaver":
+        raise NotImplementedError(f"{type(saver).__name__} cannot rename threads (SQLite only)")
     if any(True for _ in saver.list({"configurable": {"thread_id": new}}, limit=1)):
         raise ValueError(f"thread {new!r} already exists")
     with conn:

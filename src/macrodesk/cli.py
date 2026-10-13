@@ -30,14 +30,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import sqlite3
 import sys
 import uuid
 from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
-from langgraph.checkpoint.sqlite import SqliteSaver
-from langgraph.store.sqlite import SqliteStore
 from langgraph.types import Command
 from rich.console import Console
 from rich.markdown import Markdown
@@ -48,6 +45,7 @@ from macrodesk.config import get_settings
 from macrodesk.brief import run_brief
 from macrodesk.graph import build_graph, build_graph_v2
 from macrodesk.memory import forget_all, recall_feedback
+from macrodesk.persistence import open_persistence
 from macrodesk.threads import delete_thread, latest_thread_id, list_threads, rename_thread
 from macrodesk.logging import log_event, setup_logging
 
@@ -111,9 +109,21 @@ def _render_update(node: str, update: Any) -> None:
 
 
 def _stream(graph, payload, cfg) -> bool:
-    """Stream one graph run. Returns True if the run paused at an interrupt."""
+    """Stream one graph run. Returns True if the run paused at an interrupt.
+    'custom' events carry the analyst's tokens, printed live; 'updates' carry node results."""
     interrupted = False
-    for chunk in graph.stream(payload, cfg, stream_mode="updates"):
+    streaming = False
+    for mode, chunk in graph.stream(payload, cfg, stream_mode=["updates", "custom"]):
+        if mode == "custom":
+            if chunk.get("draft_reset"):
+                console.print("[dim]analyst is writing…[/]")
+                streaming = True
+            elif chunk.get("draft_delta"):
+                console.print(chunk["draft_delta"], end="", style="dim", markup=False, highlight=False, soft_wrap=True)
+            continue
+        if streaming:
+            console.print()  # end the token line before the panels
+            streaming = False
         for node, update in chunk.items():
             if node == "__interrupt__":
                 interrupted = True
@@ -256,18 +266,12 @@ def main(argv: list[str] | None = None) -> None:
     global USER_ID
     USER_ID = args.user
 
-    conn = sqlite3.connect(str(settings.checkpoint_db), check_same_thread=False)
-    saver = SqliteSaver(conn)
+    persistence = open_persistence(settings)
+    saver = persistence.saver
     thread_id = args.thread or (args.last and latest_thread_id(saver)) or uuid.uuid4().hex[:8]
     setup_logging(settings.log_dir, thread_id, settings.log_level)
-    # The store gets its OWN connection: SqliteStore and SqliteSaver both manage
-    # transactions, and sharing one connection raises "cannot start a transaction
-    # within a transaction" the first time a node touches the store mid-run
-    # (debugging note 11).
-    # isolation_level=None (autocommit) is required: with Python's default, setup() on a fresh
-    # file leaves an implicit transaction open and the store's next BEGIN fails (debugging note 16).
-    store = SqliteStore(sqlite3.connect(str(settings.checkpoint_db), check_same_thread=False, isolation_level=None))
-    store.setup()
+    log_event("persistence", backend=persistence.backend)
+    store = persistence.store
     graph = build_graph(checkpointer=saver) if args.v1 else build_graph_v2(checkpointer=saver, store=store)
     global AUTO_APPROVE
     AUTO_APPROVE = args.auto_approve

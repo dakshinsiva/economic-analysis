@@ -13,6 +13,11 @@ when one helps, and a fact-checker's verdict on the draft. Before anything is fe
 you its plan and waits: approve it, or tell it to use ten years of history instead of three, and it
 re-plans. What you tell it at that step, it remembers next time.
 
+![macrodesk demo: the recorded replay, from dashboard to plan review to a critic-checked answer](docs/images/demo.gif)
+
+*Thirty seconds of the research desk: the macro dashboard, a plan proposed and approved, evidence
+fetched, a chart, the draft streamed, the critic's verdict and the cited answer.*
+
 ![macrodesk: plan, evidence, chart and a critic-checked answer for a JOLTS question](docs/images/cover-dark.png)
 
 *A JOLTS question in the research desk. Top, the macro dashboard and the pipeline strip. Then the plan
@@ -52,14 +57,21 @@ flowchart LR
 
 | Node | Model? | What it does |
 |---|---|---|
-| **planner** | yes, structured output | Turns the question (plus anything you said at earlier reviews) into a list of tool calls over a curated registry of 24 FRED series: JOLTS, payrolls, claims, GDP, CPI/PCE, the Treasury curve |
+| **planner** | yes, structured output | Turns the question (plus anything you said at earlier reviews, and earlier turns in the thread) into a list of tool calls over 18 tools and a curated registry of 24 FRED series. Every step's arguments are validated against the tool's schema before anything runs |
 | **review** | no | Pauses the graph with `interrupt()` and shows the plan. Resume with "approve" or with feedback; feedback is also written to long-term memory |
-| **fetch** | no | Executes each step against FRED through a cached client. Errors are recorded as evidence, not raised |
+| **fetch** | no | Executes the steps concurrently against FRED through a cached, retrying client. Errors are recorded as evidence, not raised. Evidence from earlier turns is carried forward for follow-ups |
 | **analyst** | yes | Writes the answer from the evidence block only, citing `(SERIES_ID, YYYY-MM-DD)` and stating units |
-| **critic** | yes + regex | A deterministic check that every cited series and date exists in the evidence, then an LLM pass for uncited numbers and historical claims. Rejections go back to the analyst, at most twice |
+| **critic** | yes + deterministic | Two deterministic checks (every cited series and date exists in the evidence; every number is in the evidence, scaled, or derivable as a difference or percent change), then an LLM pass for the rest. Rejections go back to the analyst, at most twice |
 | **finalize** | no | Posts the answer; if issues remain after the cap, they are appended rather than hidden |
 
 Stage 1 of the project, a prebuilt ReAct agent with the same tools, is kept as `--v1` for comparison.
+
+**The 18 tools.** Retrieval: `list_known_series`, `search_fred`, `get_series`, `compare_series`,
+`compute_change`, `yield_curve_snapshot`, `recession_periods`, `plot_series`. Vintages and releases
+(ALFRED): `series_as_of` (what was known on a date), `revision_history` (first print to latest),
+`release_calendar` (past and next release dates). Context and analytics: `extremes` (max and min
+*with dates*), `percentile_rank`, `compare_to_prepandemic`, `sahm_rule`, `recession_probability`
+(NY Fed-style probit on the 10y-3m spread), `correlate`, `macro_snapshot`.
 
 ## The research desk
 
@@ -75,15 +87,18 @@ arrival in light mode: six indicators with sparklines and 12-month changes; clic
 
 - **Macro dashboard.** Unemployment, quits, openings, the 10y–2y spread, core PCE and real GDP, with
   sparklines and the change over the natural horizon for each. A tile is a question.
-- **Plan review in the page.** Approve, or type feedback and watch the plan change. The same
-  `Command(resume=...)` path serves the CLI, the REST API and LangGraph Studio.
+- **Plan review in the page.** Approve, type feedback and watch the plan change, or edit the steps
+  inline (tool, arguments, add or remove) and run the edited plan. The same `Command(resume=...)`
+  path serves the CLI, the REST API and LangGraph Studio.
 - **Evidence you can read.** Every tool result is shown as fetched, with a green or red mark.
 - **Charts from the same data.** One panel per series (never a dual axis), NBER recessions shaded,
   the latest value labelled.
 - **Citations that go somewhere.** `(UNRATE, 2026-09-01)` is a link to the series on FRED; the
-  sources used are listed under the answer; copy as markdown or download.
+  sources used are listed under the answer; copy as markdown or download. Charts export as CSV
+  and PNG; evidence blocks copy with one click.
 - **Follow-ups.** Suggested next questions built from the series the answer cited.
-- **Trace.** Per-node timings and the raw graph state, for the debugging story.
+- **Trace.** Per-node timings, the raw graph state, and a link to the run in LangSmith when
+  tracing is configured.
 - **Demo mode.** With no backend configured the page replays a recorded run, so the deployed URL
   always shows the whole pipeline.
 
@@ -113,8 +128,9 @@ uv run macrodesk "Is the yield curve inverted right now?"   # pauses for plan ap
 uv run macrodesk --auto-approve "..."                        # skip the review
 uv run macrodesk --v1 "..."                                  # the Stage 1 ReAct agent
 uv run macrodesk brief                                       # outputs/brief-<date>.md
-uv run pytest                                           # 26 offline tests, no keys needed
-uv run python evals/run_evals.py [--langsmith]          # eval harness
+uv run pytest                                           # 45 offline tests, no keys needed
+uv run python evals/run_evals.py [--langsmith]          # 24 end-to-end cases, scored; optional LangSmith experiment
+uv run python evals/run_critic_evals.py [--llm]         # the critic measured against labelled drafts
 uv run langgraph dev                                    # LangGraph server + Studio
 ```
 
@@ -124,7 +140,11 @@ The research desk, against that server:
 cd web && npm install
 cp .env.example .env.local      # LANGGRAPH_API_URL=http://127.0.0.1:2024, FRED_API_KEY for the dashboard
 npm run dev                     # http://localhost:3000 ; add ?demo=1 to force the recorded replay
+npm test && npm run test:e2e    # vitest unit tests; Playwright replay test
 ```
+
+Set `DATABASE_URL` to a Postgres URL and both the checkpointer and the Store move there, for
+several machines or a hosted server sharing threads and memory; SQLite otherwise.
 
 Inside the CLI: `/state`, `/history`, `/replay N` (time travel to a checkpoint), `/threads`,
 `/thread <name|new|rename|delete>`, `/prefs`, `/forget`. `--thread NAME` resumes a conversation,
@@ -181,26 +201,27 @@ design, single-machine persistence, six eval cases, one model tuned.
 
 ## Debugging log
 
-Sixteen incidents so far, each with the symptom, how it was localised and the fix:
+Nineteen incidents so far, each with the symptom, how it was localised and the fix:
 a native wheel that tried to compile Rust, a gateway that silently rewrote the model endpoint, a
 400 from a prompt with no user turn (twice: once in Studio, once in my own critic), a circular
 import, Pydantic objects in checkpointed state, a critic that rejected correct arithmetic, two
 libraries sharing one SQLite connection, and a `copy_thread` that exists on the base class but not in
-SQLite, plus two from wiring the web app. [docs/02-debugging.md](docs/02-debugging.md).
+SQLite, two from wiring the web app, and three from the planner's arguments, the analyst citing
+an earlier answer, and a leaky number whitelist. [docs/02-debugging.md](docs/02-debugging.md).
 
 ## Repository layout
 
 | Path | What it is |
 |---|---|
 | `src/macrodesk/graph.py`, `nodes.py`, `state.py` | The Stage 2 graph: planner, review, fetch, analyst, critic, finalize |
-| `src/macrodesk/tools.py`, `fred/` | Eight tools over a cached FRED client and a curated series registry |
+| `src/macrodesk/tools.py`, `fred/` | Eighteen tools over a cached, retrying FRED client (incl. ALFRED vintages) and a curated series registry |
 | `src/macrodesk/charts.py` | Small-multiple PNG charts for the CLI; JSON payloads for the web |
-| `src/macrodesk/memory.py`, `threads.py` | Store-backed plan memory; thread list, rename, delete |
+| `src/macrodesk/memory.py`, `threads.py`, `persistence.py` | Store-backed plan memory; thread list, rename, delete; SQLite or Postgres behind one factory |
 | `src/macrodesk/cli.py`, `brief.py` | REPL with checkpoint inspection and time travel; the daily brief |
 | `web/` | The research desk: Next.js 16, LangGraph SDK `useStream`, Recharts |
-| `tests/` | 26 offline tests: stub FRED, recorded fixtures, scripted models, SQLite threads |
-| `evals/` | Cases, scorer, LangSmith experiment |
-| `docs/` | Architecture, the debugging log, interview notes |
+| `tests/`, `web/e2e`, `web/src/lib/__tests__` | 45 offline Python tests; vitest and Playwright for the web |
+| `evals/` | 24 end-to-end cases and a labelled critic set, scorers, LangSmith experiment, nightly workflow |
+| `docs/` | Architecture, the debugging log, interview notes, reflections, the LangGraph/LangSmith guide |
 
 ## Built by
 

@@ -1,0 +1,87 @@
+# Labelled (draft, evidence) pairs for measuring the critic itself: does it reject what should be
+# rejected and approve what should be approved? `verdict` is the ground truth.
+- id: ok_cited_and_derived
+  verdict: approve
+  evidence: |
+    JTSJOL: Job Openings [Thousands, SA]
+    window 2023-09-01 to 2026-08-01 (36 obs); min 6,550.00, max 7,585.00, mean 7,180.42 (all in Thousands, SA)
+    2026-07-01  7,335.00
+    2026-08-01  7,079.00
+  draft: |
+    Job openings fell to 7,079 thousand in August 2026 (JTSJOL, 2026-08-01), down 256 thousand from July (JTSJOL, 2026-07-01), about 3.5% lower.
+- id: unit_error_thousands
+  verdict: reject
+  evidence: |
+    JTSJOL: Job Openings [Thousands, SA]
+    window 2023-09-01 to 2026-08-01 (36 obs); min 6,550.00, max 7,585.00, mean 7,180.42 (all in Thousands, SA)
+    2026-08-01  7,079.00
+  draft: |
+    Openings were 7,079 thousand (JTSJOL, 2026-08-01) against a mean of 7,180,420 thousand over the window.
+- id: memory_peak_uncited
+  verdict: reject
+  evidence: |
+    JTSQUR: Quits Rate [Percent, SA]
+    window 2023-09-01 to 2026-08-01 (36 obs); min 1.90, max 2.30, mean 2.04 (all in Percent, SA)
+    2026-08-01  1.90
+  draft: |
+    The quits rate is 1.9% (JTSQUR, 2026-08-01), far below its 3.0% peak in late 2021.
+- id: wrong_date_cited
+  verdict: reject
+  evidence: |
+    UNRATE: Unemployment Rate [Percent, SA]
+    2026-08-01  4.10
+    2026-09-01  4.20
+  draft: |
+    Unemployment was 4.2% in September (UNRATE, 2026-10-01).
+- id: ok_percent_of_target_from_question
+  verdict: approve
+  question: "Is core PCE above the 2% target?"
+  evidence: |
+    PCEPILFE % change over 12 obs, last 2:
+    2026-07-01  2.98
+    2026-08-01  3.01
+  draft: |
+    Yes. Core PCE inflation is 3.01% (PCEPILFE, 2026-08-01), about 1 percentage point above the 2% target, after 2.98% in July (PCEPILFE, 2026-07-01).
+- id: ok_counts_and_years
+  verdict: approve
+  evidence: |
+    PCEPILFE % change over 12 obs, last 6:
+    2026-03-01  3.11
+    2026-04-01  3.08
+    2026-05-01  3.16
+    2026-06-01  3.04
+    2026-07-01  2.98
+    2026-08-01  3.01
+  draft: |
+    Five of the six readings since March 2026 are at or above 3% (PCEPILFE, 2026-03-01 to 2026-08-01); the range is 2.98% to 3.16%.
+- id: series_not_fetched
+  verdict: reject
+  evidence: |
+    JTSQUR: Quits Rate [Percent, SA]
+    2026-08-01  1.90
+  draft: |
+    Quits are 1.9% (JTSQUR, 2026-08-01) while unemployment is 4.2% (UNRATE, 2026-09-01).
+- id: ok_qualified_window_peak
+  verdict: approve
+  evidence: |
+    JTSJOL: Job Openings [Thousands, SA]
+    window 2021-01-01 to 2026-08-01 (68 obs); min 6,550.00, max 12,301.00, mean 8,822.54 (all in Thousands, SA)
+    2026-08-01  7,079.00
+  draft: |
+    Openings are 7,079 thousand (JTSJOL, 2026-08-01), about 42% below the 12,301 thousand maximum in the window shown (the peak month itself was not retrieved).
+- id: fabricated_level
+  verdict: reject
+  evidence: |
+    ICSA: Initial Claims [Number, SA]
+    2026-09-26  207,000.00
+    2026-10-03  197,000.00
+  draft: |
+    Claims fell to 197,000 (ICSA, 2026-10-03), the lowest since the 182,000 print in January (ICSA, 2026-01-10).
+- id: ok_change_in_pp
+  verdict: approve
+  evidence: |
+    UNRATE change over 12 obs (Percent, SA), last 2:
+    2026-08-01  -0.20
+    2026-09-01  -0.10
+  draft: |
+    Unemployment is 0.1 percentage point lower than a year ago (UNRATE, 2026-09-01), after a 0.2 point decline in August (UNRATE, 2026-08-01).

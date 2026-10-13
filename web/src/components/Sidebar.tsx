@@ -3,8 +3,9 @@ import type { Thread } from "@langchain/langgraph-sdk";
 
 export type Pref = { text: string; ts: string };
 
-export function Sidebar({ threads, currentId, onPick, onNew, prefs, mode }:
-  { threads: Thread[]; currentId: string | null; onPick: (id: string) => void; onNew: () => void; prefs: Pref[]; mode: "live" | "demo" }) {
+export function Sidebar({ threads, currentId, onPick, onNew, prefs, mode, userId, onUserId }:
+  { threads: Thread[]; currentId: string | null; onPick: (id: string) => void; onNew: () => void; prefs: Pref[]; mode: "live" | "demo";
+    userId?: string; onUserId?: (u: string) => void }) {
   return (
     <aside className="w-64 shrink-0 border-r border-line hidden lg:flex flex-col gap-6 p-4 text-sm overflow-y-auto">
       <div>
@@ -40,6 +41,14 @@ export function Sidebar({ threads, currentId, onPick, onNew, prefs, mode }:
           </ul>
         )}
       </div>
+      {mode === "live" && onUserId && (
+        <div>
+          <h2 className="font-semibold mb-1">User</h2>
+          <input className="input w-full text-xs" defaultValue={userId} placeholder="user id for memory namespace"
+            onBlur={(e) => onUserId(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+          <p className="text-muted text-[11px] mt-1">Sets <code>configurable.user_id</code>: the Store namespace for remembered feedback. No login yet; this is the hook for one.</p>
+        </div>
+      )}
       <div>
         <h2 className="font-semibold mb-2">Remembered feedback</h2>
         {prefs.length === 0 ? (

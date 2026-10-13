@@ -8,6 +8,8 @@ from langchain_anthropic import ChatAnthropic
 from macrodesk.config import get_settings
 
 
-def make_model() -> ChatAnthropic:
+def make_model(role: str | None = None) -> ChatAnthropic:
+    """role in {None, "planner", "critic"}: picks ECON_PLANNER_MODEL / ECON_CRITIC_MODEL when set."""
     s = get_settings()
-    return ChatAnthropic(model=s.model, max_tokens=s.max_tokens)
+    model = {"planner": s.planner_model, "critic": s.critic_model}.get(role or "") or s.model
+    return ChatAnthropic(model=model, max_tokens=s.max_tokens)

@@ -37,6 +37,24 @@ class FakeFred:
     def get_info(self, series_id: str) -> dict:
         return {"units_short": self._data.get(series_id.upper(), {}).get("units", "?")}
 
+    # --- vintages / releases (synthetic but shaped like the real client) ---
+    def get_series_as_of(self, series_id: str, as_of: str) -> pd.Series:
+        s = self.get_series(series_id, None, as_of)
+        if s.empty:
+            raise FredError(f"No vintage of {series_id!r} was available as of {as_of}.")
+        return (s - 0.1).round(2)  # "first prints" a touch lower than today's values
+
+    def get_all_releases(self, series_id: str, start=None) -> pd.DataFrame:
+        s = self.get_series(series_id, start)
+        rows = []
+        for d, v in s.tail(3).items():
+            rows.append({"realtime_start": d + pd.Timedelta(days=30), "date": d, "value": round(float(v) - 0.1, 2)})
+            rows.append({"realtime_start": d + pd.Timedelta(days=60), "date": d, "value": float(v)})
+        return pd.DataFrame(rows)
+
+    def release_dates(self, series_id: str, limit: int = 6) -> dict:
+        return {"release": "Fake Release", "release_id": 1, "past": ["2026-09-01", "2026-08-01"], "scheduled": ["2026-11-03"]}
+
     def search(self, text: str, limit: int = 10) -> pd.DataFrame:
         self.calls.append(("search", text))
         return pd.DataFrame([{

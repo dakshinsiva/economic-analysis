@@ -1,6 +1,6 @@
 export type Step = { tool: string; args: Record<string, unknown>; why: string };
 export type Plan = { goal: string; steps: Step[] };
-export type Evidence = { tool: string; args: Record<string, unknown>; result: string; ok: boolean };
+export type Evidence = { tool: string; args: Record<string, unknown>; result: string; ok: boolean; prior?: boolean };
 export type Critique = { approved: boolean; issues: string[] };
 export type ChartPanel = { id: string; title: string; units: string; points: { d: string; v: number }[] };
 export type Chart = { title: string; panels: ChartPanel[]; recessions: { from: string; to: string }[] };
@@ -11,6 +11,7 @@ export type AgentState = {
   plan?: Plan | null;
   plan_feedback?: string | null;
   evidence?: Evidence[];
+  prior_evidence?: Evidence[];
   charts?: Chart[];
   draft?: string;
   critique?: Critique | null;

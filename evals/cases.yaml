@@ -1,5 +1,6 @@
-# Each case: the question, the FRED series the plan should fetch (any order),
-# tools that must / must not appear. Scoring is in evals/run_evals.py.
+# Each case: the question, the FRED series the plan should fetch (any order), tools that must /
+# must not appear. Scoring is in evals/run_evals.py. Cases marked adversarial probe failure modes:
+# ambiguity, data outside FRED, revisions, and questions that tempt the model to answer from memory.
 - id: jolts_latest
   question: "What does the latest JOLTS report say about the labor market?"
   expected_series: [JTSJOL, JTSQUR]
@@ -23,3 +24,73 @@
   question: "Plot the unemployment rate over the last five years."
   expected_series: [UNRATE]
   expect_tools: [plot_series]
+# --- added 2026-10-13: history, vintages, analytics ---
+- id: openings_peak_date
+  question: "When did job openings peak, and how far below the peak are they now?"
+  expected_series: [JTSJOL]
+  expect_tools: [extremes]
+- id: gdp_revisions
+  question: "How much has the latest quarter's GDP growth been revised since its first estimate?"
+  expected_series: [A191RL1Q225SBEA]
+  expect_tools: [revision_history]
+- id: known_at_the_time
+  question: "What did the unemployment rate look like as of June 2026, before any later revisions?"
+  expected_series: [UNRATE]
+  expect_tools: [series_as_of]
+- id: next_release
+  question: "When is the next JOLTS release?"
+  expected_series: [JTSJOL]
+  expect_tools: [release_calendar]
+- id: historically_high
+  question: "Is the 10-year Treasury yield high by historical standards?"
+  expected_series: [DGS10]
+  expect_tools: [percentile_rank]
+- id: back_to_normal
+  question: "Has the quits rate returned to its pre-pandemic level?"
+  expected_series: [JTSQUR]
+  expect_tools: [compare_to_prepandemic]
+- id: recession_risk
+  question: "What is the current recession risk according to the Sahm rule and the yield curve?"
+  expected_series: []
+  expect_tools: [sahm_rule, recession_probability]
+- id: state_of_economy
+  question: "Give me a one-screen snapshot of the US economy right now."
+  expected_series: []
+  expect_tools: [macro_snapshot]
+- id: move_together
+  question: "Do the quits rate and the unemployment rate move together?"
+  expected_series: [JTSQUR, UNRATE]
+  expect_tools: [correlate]
+- id: claims_trend
+  question: "Are initial jobless claims trending up?"
+  expected_series: [ICSA]
+- id: fed_vs_market
+  question: "Is the market pricing the fed funds rate above or below where the Fed has it?"
+  expected_series: [FEDFUNDS, DGS2]
+- id: housing_rates
+  question: "How have housing starts responded to the rise in long-term rates since 2022?"
+  expected_series: [HOUST, DGS10]
+- id: payrolls_breakeven
+  question: "Is monthly payroll growth still above the roughly 100k breakeven pace?"
+  expected_series: [PAYEMS]
+  expect_tools: [compute_change]
+- id: inflation_vs_fed
+  question: "Compare core CPI and core PCE inflation over the last year and say which the Fed targets."
+  expected_series: [CPILFESL, PCEPILFE]
+# --- adversarial ---
+- id: adversarial_memory_bait
+  question: "Remind me what job openings peaked at in 2022 and compare with today."
+  expected_series: [JTSJOL]
+  expect_tools: [extremes]
+- id: adversarial_outside_fred
+  question: "What was Apple's revenue last quarter and how does it relate to consumer sentiment?"
+  expected_series: [UMCSENT]
+  forbid_tools: [plot_series]
+- id: adversarial_ambiguous_series
+  question: "What is the latest inflation number?"
+  expected_series: []
+  expect_tools: []
+- id: adversarial_bad_series_hint
+  question: "Pull the series JOBOPEN and tell me the latest value."
+  expected_series: []
+  expect_tools: [search_fred]

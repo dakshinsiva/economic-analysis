@@ -11,6 +11,7 @@ Rules that make tools LLM-friendly (and testable):
 
 from __future__ import annotations
 
+import math
 from datetime import date, timedelta
 from functools import lru_cache
 from typing import Optional
@@ -46,6 +47,19 @@ def _units(series_id: str) -> str:
         return _client().get_info(series_id).get("units_short", "?")
     except FredError:
         return "?"
+
+
+def _staleness_note(sid: str, s: pd.Series) -> str:
+    """Flag series whose last observation is older than expected for its frequency (possibly discontinued)."""
+    freq = REGISTRY[sid].frequency if sid in REGISTRY else None
+    expected = {"D": 10, "W": 21, "M": 75, "Q": 150}.get(freq or "", 400)
+    age = (date.today() - s.index[-1].date()).days
+    return f" (note: last observation is {age} days old; check for discontinuation)" if age > expected else ""
+
+
+def _series_for(sid: str, start: str | None = None, years: int = 5) -> pd.Series:
+    start = start or (date.today() - timedelta(days=years * 365)).isoformat()
+    return _client().get_series(sid.upper(), start)
 
 
 # --------------------------------------------------------------------------- #
@@ -96,8 +110,9 @@ def get_series(series_id: str, start: Optional[str] = None, end: Optional[str] =
     except FredError as e:
         return f"ERROR: {e}"
     title = REGISTRY[sid].title if sid in REGISTRY else sid
+    stale = _staleness_note(sid, s)
     return (
-        f"{sid}: {title} [{_units(sid)}]\n"
+        f"{sid}: {title} [{_units(sid)}]{stale}\n"
         f"window {s.index[0].date()} to {s.index[-1].date()} ({len(s)} obs); "
         f"min {_fmt(s.min())}, max {_fmt(s.max())}, mean {_fmt(s.mean())} (all in {_units(sid)})\n"
         f"latest {last_n}:\n{_tail_table(s, last_n)}"
@@ -253,5 +268,210 @@ def plot_series(series_ids: list[str], start: Optional[str] = None, title: Optio
     return out
 
 
+# --------------------------------------------------------------------------- #
+# Vintages, releases and revisions (ALFRED)
+# --------------------------------------------------------------------------- #
+@tool
+def series_as_of(series_id: str, as_of_date: str, last_n: int = 6) -> str:
+    """What a series looked like on a past date, before later revisions (FRED/ALFRED vintage).
+    Use for 'what was known at the time' and 'before the revision' questions. as_of_date is YYYY-MM-DD.
+    """
+    sid = series_id.upper()
+    try:
+        vintage = _client().get_series_as_of(sid, as_of_date)
+        current = _client().get_series(sid, (pd.Timestamp(as_of_date) - pd.Timedelta(days=5 * 365)).date().isoformat())
+    except FredError as e:
+        return f"ERROR: {e}"
+    tail = vintage.tail(last_n)
+    rows = []
+    for d, v in tail.items():
+        now = current.get(d)
+        diff = "" if now is None or pd.isna(now) else f"  (current {_fmt(float(now))}, revised {float(now) - float(v):+.2f})"
+        rows.append(f"{d.date()}  {_fmt(float(v))}{diff}")
+    return (f"{sid} as published on {as_of_date} [{_units(sid)}]; latest observation then: {vintage.index[-1].date()}\n"
+            f"vintage value (and today's value for the same date):\n" + "\n".join(rows))
+
+
+@tool
+def revision_history(series_id: str, observations: int = 4) -> str:
+    """How the most recent observations of a series were revised across releases: first print,
+    each later print, and the net revision. Use for 'how much was X revised' and data-quality caveats.
+    """
+    sid = series_id.upper()
+    try:
+        df = _client().get_all_releases(sid, (date.today() - timedelta(days=2 * 365)).isoformat())
+    except FredError as e:
+        return f"ERROR: {e}"
+    dates = sorted(df["date"].unique())[-observations:]
+    lines = [f"{sid} revision history [{_units(sid)}] (first print -> latest print):"]
+    for d in dates:
+        g = df[df["date"] == d].sort_values("realtime_start")
+        prints = " -> ".join(f"{_fmt(float(v))} ({r.date()})" for r, v in zip(g["realtime_start"], g["value"]))
+        net = float(g["value"].iloc[-1]) - float(g["value"].iloc[0])
+        lines.append(f"{pd.Timestamp(d).date()}: {prints}; net revision {net:+.2f} over {len(g)} print(s)")
+    return "\n".join(lines)
+
+
+@tool
+def release_calendar(series_id: str) -> str:
+    """The release a series belongs to, its recent release dates and the next scheduled ones.
+    Use for 'when is the next JOLTS/CPI/GDP release' and to explain publication lags.
+    """
+    try:
+        r = _client().release_dates(series_id)
+    except FredError as e:
+        return f"ERROR: {e}"
+    return (f"{series_id.upper()} is published in release '{r['release']}' (id {r['release_id']}).\n"
+            f"recent release dates: {', '.join(r['past']) or 'n/a'}\n"
+            f"next scheduled: {', '.join(r['scheduled']) or 'not yet scheduled'}")
+
+
+# --------------------------------------------------------------------------- #
+# Historical context and analytics
+# --------------------------------------------------------------------------- #
+@tool
+def extremes(series_id: str, start: Optional[str] = None) -> str:
+    """Maximum and minimum of a series with their DATES, plus where the latest value sits between them.
+    Use whenever an answer mentions a peak, trough, high or low, so the date can be cited.
+    """
+    sid = series_id.upper()
+    try:
+        s = _series_for(sid, start, years=10)
+    except FredError as e:
+        return f"ERROR: {e}"
+    hi, lo = s.idxmax(), s.idxmin()
+    latest = float(s.iloc[-1]); span = float(s.max() - s.min()) or 1.0
+    pos = (latest - float(s.min())) / span * 100
+    return (f"{sid} [{_units(sid)}] over {s.index[0].date()} to {s.index[-1].date()}:\n"
+            f"max {_fmt(float(s.max()))} on {hi.date()}; min {_fmt(float(s.min()))} on {lo.date()}\n"
+            f"latest {_fmt(latest)} on {s.index[-1].date()} = {pos:.0f}% of the way from the min to the max")
+
+
+@tool
+def percentile_rank(series_id: str, years: int = 20) -> str:
+    """Where the latest value ranks against the series' own history (percentile, z-score, mean, median).
+    Use for 'is this high by historical standards'.
+    """
+    sid = series_id.upper()
+    try:
+        s = _series_for(sid, years=years)
+    except FredError as e:
+        return f"ERROR: {e}"
+    latest = float(s.iloc[-1]); hist = s.iloc[:-1]
+    pct = float((hist < latest).mean() * 100)
+    z = (latest - float(hist.mean())) / (float(hist.std()) or 1.0)
+    return (f"{sid} latest {_fmt(latest)} ({s.index[-1].date()}) vs {len(hist)} prior obs since {s.index[0].date()}:\n"
+            f"percentile {pct:.0f} (higher than {pct:.0f}% of history); z-score {z:+.2f}; "
+            f"mean {_fmt(float(hist.mean()))}, median {_fmt(float(hist.median()))} [{_units(sid)}]")
+
+
+@tool
+def compare_to_prepandemic(series_id: str) -> str:
+    """Latest value against the 2019 average and the 2017-2019 average (pre-pandemic baselines),
+    in levels and percent. Use for 'back to normal?' questions.
+    """
+    sid = series_id.upper()
+    try:
+        s = _client().get_series(sid, "2017-01-01")
+    except FredError as e:
+        return f"ERROR: {e}"
+    y2019 = s[(s.index >= "2019-01-01") & (s.index < "2020-01-01")]
+    y1719 = s[(s.index >= "2017-01-01") & (s.index < "2020-01-01")]
+    if y2019.empty:
+        return f"ERROR: {sid} has no 2019 observations."
+    latest = float(s.iloc[-1]); a19, a1719 = float(y2019.mean()), float(y1719.mean())
+    def rel(a: float) -> str:
+        return f"{(latest / a - 1) * 100:+.1f}%" if a else "n/a"
+    return (f"{sid} [{_units(sid)}] latest {_fmt(latest)} ({s.index[-1].date()})\n"
+            f"2019 average {_fmt(a19)} -> latest is {latest - a19:+.2f} ({rel(a19)}) vs 2019\n"
+            f"2017-2019 average {_fmt(a1719)} -> latest is {latest - a1719:+.2f} ({rel(a1719)}) vs 2017-2019")
+
+
+@tool
+def sahm_rule() -> str:
+    """Sahm Rule recession indicator from UNRATE: 3-month average unemployment minus its 12-month low.
+    A reading of 0.50 or more has historically signalled the start of a recession. Returns the last 6 values.
+    """
+    try:
+        u = _client().get_series("UNRATE", (date.today() - timedelta(days=4 * 365)).isoformat())
+    except FredError as e:
+        return f"ERROR: {e}"
+    ma3 = u.rolling(3).mean()
+    sahm = (ma3 - ma3.rolling(12).min()).dropna()
+    latest = float(sahm.iloc[-1])
+    flag = "TRIGGERED (>= 0.50)" if latest >= 0.5 else "not triggered (< 0.50)"
+    return (f"Sahm Rule indicator (UNRATE, pp): latest {latest:.2f} on {sahm.index[-1].date()} -> {flag}\n"
+            f"last 6:\n{_tail_table(sahm, 6)}")
+
+
+@tool
+def recession_probability() -> str:
+    """Probability of a US recession 12 months ahead from the 10y-3m Treasury spread, using the
+    NY Fed-style probit (Estrella-Trubin coefficients). Returns the latest monthly-average spread and probability.
+    """
+    try:
+        sp = _client().get_series("T10Y3M", (date.today() - timedelta(days=2 * 365)).isoformat())
+    except FredError as e:
+        return f"ERROR: {e}"
+    monthly = sp.resample("ME").mean().dropna()
+    def prob(x: float) -> float:  # Phi(a + b*spread), a=-0.5333, b=-0.6330
+        return 0.5 * (1 + math.erf((-0.5333 - 0.6330 * x) / math.sqrt(2)))
+    rows = [f"{d.date()}  spread {v:+.2f}  prob {prob(float(v)) * 100:.0f}%" for d, v in monthly.tail(6).items()]
+    latest = float(monthly.iloc[-1])
+    return (f"12-month-ahead recession probability from the 10y-3m spread (T10Y3M, monthly average):\n"
+            f"latest spread {latest:+.2f} ({monthly.index[-1].date()}) -> probability {prob(latest) * 100:.0f}%\n"
+            "last 6 months:\n" + "\n".join(rows) +
+            "\nModel: probit with coefficients -0.5333 and -0.6330 (Estrella & Trubin, NY Fed 2006); indicative only.")
+
+
+@tool
+def correlate(series_a: str, series_b: str, start: Optional[str] = None, on_changes: bool = True) -> str:
+    """Correlation between two series over a window, on period-over-period changes by default
+    (levels are usually spuriously correlated). Use for 'do X and Y move together'.
+    """
+    a, b = series_a.upper(), series_b.upper()
+    try:
+        sa, sb = _series_for(a, start, years=10), _series_for(b, start, years=10)
+    except FredError as e:
+        return f"ERROR: {e}"
+    df = pd.concat([sa, sb], axis=1).dropna()
+    if len(df) < 12:
+        return f"ERROR: fewer than 12 overlapping observations between {a} and {b}."
+    if on_changes:
+        df = df.diff().dropna()
+    r = float(df.iloc[:, 0].corr(df.iloc[:, 1]))
+    kind = "changes" if on_changes else "levels"
+    return (f"correlation of {kind} between {a} and {b}: {r:+.2f} over {len(df)} overlapping obs "
+            f"({df.index[0].date()} to {df.index[-1].date()})")
+
+
+@tool
+def macro_snapshot() -> str:
+    """One-screen snapshot of the key indicators: latest value, date, and change over the natural horizon
+    (12 months for monthly series, 3 months for daily, 1 quarter for quarterly). Use for 'state of the economy'.
+    """
+    spec = [("UNRATE", 12), ("PAYEMS", 12), ("JTSJOL", 12), ("JTSQUR", 12), ("ICSA", 4), ("CPILFESL", 12),
+            ("PCEPILFE", 12), ("A191RL1Q225SBEA", 1), ("FEDFUNDS", 12), ("DGS10", 63), ("T10Y2Y", 63), ("T10Y3M", 63)]
+    lines = ["indicator          latest       date        change        units"]
+    for sid, back in spec:
+        try:
+            s = _series_for(sid, years=4)
+        except FredError as e:
+            lines.append(f"{sid:18} ERROR {e}")
+            continue
+        latest = float(s.iloc[-1]); prev = float(s.iloc[max(0, len(s) - 1 - back)])
+        if sid in ("CPILFESL", "PCEPILFE", "PAYEMS"):
+            chg = f"{(latest / prev - 1) * 100:+.2f}% " + ("yoy" if sid != "PAYEMS" else "yoy")
+            if sid == "PAYEMS":
+                chg = f"{latest - float(s.iloc[-2]):+,.0f}k m/m"
+        else:
+            chg = f"{latest - prev:+.2f} vs {back} obs ago"
+        lines.append(f"{sid:18} {_fmt(latest):>10}   {s.index[-1].date()}  {chg:<14} {_units(sid)}")
+    return "\n".join(lines)
+
+
 ALL_TOOLS = [list_known_series, search_fred, get_series, compute_change, compare_series,
-             yield_curve_snapshot, recession_periods, plot_series]
+             yield_curve_snapshot, recession_periods, plot_series,
+             series_as_of, revision_history, release_calendar,
+             extremes, percentile_rank, compare_to_prepandemic, sahm_rule, recession_probability, correlate,
+             macro_snapshot]

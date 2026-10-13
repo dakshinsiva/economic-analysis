@@ -51,3 +51,58 @@ def test_plot_series_writes_png(fake_fred, tmp_path, monkeypatch):
     assert "Chart saved to" in out and "WARNINGS" in out
     png = next((tmp_path / "outputs").glob("*.png"))
     assert png.stat().st_size > 10_000
+
+
+# ---------------------------------------------------------------- new tools
+from macrodesk.tools import (compare_to_prepandemic, correlate, extremes, macro_snapshot, percentile_rank,
+                             recession_probability, release_calendar, revision_history, sahm_rule, series_as_of)
+
+
+def test_extremes_cites_dates(fake_fred):
+    out = extremes.invoke({"series_id": "JTSJOL", "start": "2019-01-01"})
+    assert "max 12,301.00 on 2022-03-01" in out and "min 4,606.00 on 2020-04-01" in out
+
+
+def test_percentile_rank_and_zscore(fake_fred):
+    out = percentile_rank.invoke({"series_id": "UNRATE", "years": 9})
+    assert "percentile" in out and "z-score" in out and "UNRATE latest 4.20" in out
+
+
+def test_compare_to_prepandemic_uses_2019_average(fake_fred):
+    out = compare_to_prepandemic.invoke({"series_id": "JTSQUR"})
+    assert "2019 average 2.32" in out and "vs 2019" in out
+
+
+def test_sahm_rule_not_triggered_in_fixture(fake_fred):
+    out = sahm_rule.invoke({})
+    assert "Sahm Rule" in out and "not triggered" in out
+
+
+def test_recession_probability_from_spread(fake_fred):
+    out = recession_probability.invoke({})
+    assert "probability" in out and "T10Y3M" in out and "%" in out
+
+
+def test_correlate_on_changes(fake_fred):
+    out = correlate.invoke({"series_a": "JTSQUR", "series_b": "UNRATE"})
+    assert out.startswith("correlation of changes between JTSQUR and UNRATE")
+
+
+def test_series_as_of_shows_vintage_and_revision(fake_fred):
+    out = series_as_of.invoke({"series_id": "UNRATE", "as_of_date": "2026-06-01", "last_n": 2})
+    assert "as published on 2026-06-01" in out and "revised" in out
+
+
+def test_revision_history_lists_prints(fake_fred):
+    out = revision_history.invoke({"series_id": "UNRATE", "observations": 2})
+    assert "first print -> latest print" in out and "net revision" in out
+
+
+def test_release_calendar(fake_fred):
+    out = release_calendar.invoke({"series_id": "JTSJOL"})
+    assert "Fake Release" in out and "next scheduled: 2026-11-03" in out
+
+
+def test_macro_snapshot_lists_indicators(fake_fred):
+    out = macro_snapshot.invoke({})
+    assert "UNRATE" in out and "indicator" in out  # unknown series in the fixture are reported as ERROR rows, not raised

@@ -14,7 +14,7 @@ import { Dashboard } from "./Dashboard";
 import { Trace, type NodeTiming } from "./Trace";
 import { followUps } from "@/lib/cite";
 import { useDemo } from "@/lib/useDemo";
-import { EXAMPLES, type AgentState, type NodeName, type PlanReviewInterrupt, textOf } from "@/lib/types";
+import { EXAMPLES, type AgentState, type NodeName, type Plan, type PlanReviewInterrupt, textOf } from "@/lib/types";
 
 type Mode = "checking" | "live" | "demo";
 
@@ -50,6 +50,9 @@ function Live() {
   const [prefs, setPrefs] = useState<Pref[]>([]);
   const [timings, setTimings] = useState<NodeTiming[]>([]);
   const [dashOpen, setDashOpen] = useState(true);
+  const [userId, setUserId] = useState<string>(() => { try { return localStorage.getItem("macrodesk.user") || "default"; } catch { return "default"; } });
+  const [runId, setRunId] = useState<string | null>(null);
+  const [traceUrl, setTraceUrl] = useState<string | null>(null);
 
   const stream = useStream<AgentState, { InterruptType: PlanReviewInterrupt }>({
     // The SDK builds absolute URLs, so a relative base is rejected ("Invalid URL").
@@ -79,21 +82,28 @@ function Live() {
       if (e.draft_reset) mutate({ draft: "" });
       if (e.draft_delta) mutate((prev) => ({ draft: (prev.draft ?? "") + e.draft_delta }));
     },
+    onMetadataEvent: (m) => { if (m?.run_id) setRunId(m.run_id); },
     onFinish: () => setActive(null),
     onError: () => setActive(null),
   });
+  useEffect(() => {
+    if (!runId) return;
+    let alive = true;
+    fetch(`/api/langsmith?run_id=${encodeURIComponent(runId)}`).then((r) => r.json()).then((j) => { if (alive) setTraceUrl(j.url ?? null); }).catch(() => {});
+    return () => { alive = false; };
+  }, [runId]);
 
   const client = stream.client;
   const refresh = useCallback(async () => {
     try {
       const [t, p] = await Promise.all([
         client.threads.search({ limit: 20, sortBy: "updated_at", sortOrder: "desc" }),
-        client.store.searchItems(["prefs", "default"], { limit: 20 }),
+        client.store.searchItems(["prefs", userId], { limit: 20 }),
       ]);
       setThreads(t);
       setPrefs(p.items.map((i) => i.value as Pref).sort((a, b) => a.ts.localeCompare(b.ts)));
     } catch { /* store may be unavailable; sidebar degrades */ }
-  }, [client]);
+  }, [client, userId]);
   const loading = stream.isLoading;
   useEffect(() => { const id = setTimeout(refresh, 0); return () => clearTimeout(id); }, [refresh, loading]);
 
@@ -102,21 +112,28 @@ function Live() {
 
   const ask = (q: string) => {
     setDone([]); setActive("planner"); setTimings([{ node: "submitted", at: Date.now() }]); setDashOpen(false);
-    stream.submit({ messages: [{ type: "human", content: q }] }, { config: { configurable: { user_id: "default" } } });
+    stream.submit({ messages: [{ type: "human", content: q }] }, { config: { configurable: { user_id: userId } } });
   };
   const decide = (d: string) => {
     setActive(d === "approve" ? "fetch" : "planner");
     setTimings((t) => [...t, { node: "resumed", at: Date.now() }]);
     stream.submit(null, { command: { resume: d } });
   };
+  const submitPlan = (p: Plan) => {
+    setActive("fetch");
+    setTimings((t) => [...t, { node: "resumed", at: Date.now() }]);
+    stream.submit(null, { command: { resume: { plan: p } } });
+  };
 
   return (
     <Shell mode="live" sidebar={<Sidebar mode="live" threads={threads} currentId={threadId} prefs={prefs}
+      userId={userId} onUserId={(u) => { const v = u.trim() || "default"; setUserId(v); try { localStorage.setItem("macrodesk.user", v); } catch {} }}
       onPick={(id) => { setThreadId(id); setDone(["planner", "review", "fetch", "analyst", "critic", "finalize"]); setActive(null); setTimings([]); }}
-      onNew={() => { setThreadId(null); setDone([]); setActive(null); setTimings([]); }} />}>
+      onNew={() => { setThreadId(null); setDone([]); setActive(null); setTimings([]); setRunId(null); setTraceUrl(null); }} />}>
       <Dashboard mode="live" onAsk={ask} open={dashOpen} onToggle={() => setDashOpen((o) => !o)} />
       <Run values={stream.values} active={shownActive} done={done} interrupt={interrupt} isLoading={stream.isLoading}
-        error={stream.error ? String(stream.error) : null} onDecide={decide} onAsk={ask} onStop={() => stream.stop()} timings={timings} />
+        error={stream.error ? String(stream.error) : null} onDecide={decide} onSubmitPlan={submitPlan} onAsk={ask} onStop={() => stream.stop()} timings={timings}
+        runId={runId} traceUrl={traceUrl} />
     </Shell>
   );
 }
@@ -204,10 +221,10 @@ function Shell({ mode, sidebar, children }: { mode: "live" | "demo"; sidebar: Re
   );
 }
 
-function Run({ values, active, done, interrupt, isLoading, error, onDecide, onAsk, onStop, demoQuestion, timings, autoApproveIn }: {
+function Run({ values, active, done, interrupt, isLoading, error, onDecide, onSubmitPlan, onAsk, onStop, demoQuestion, timings, autoApproveIn, runId, traceUrl }: {
   values: AgentState; active: NodeName | null; done: NodeName[]; interrupt: PlanReviewInterrupt | null; isLoading: boolean;
-  error: string | null; onDecide: (d: string) => void; onAsk: (q: string) => void; onStop: () => void; demoQuestion?: string;
-  timings: NodeTiming[]; autoApproveIn?: number;
+  error: string | null; onDecide: (d: string) => void; onSubmitPlan?: (p: Plan) => void; onAsk: (q: string) => void; onStop: () => void; demoQuestion?: string;
+  timings: NodeTiming[]; autoApproveIn?: number; runId?: string | null; traceUrl?: string | null;
 }) {
   const [q, setQ] = useState("");
   const msgs = useMemo(() => values.messages ?? [], [values.messages]);
@@ -269,9 +286,10 @@ function Run({ values, active, done, interrupt, isLoading, error, onDecide, onAs
         )}
         {lastHuman && <div className="text-sm"><span className="tag bg-line/60 text-fg mr-2">you</span>{textOf(lastHuman)}</div>}
         {error && <div className="card border-l-4 border-l-bad p-3 text-sm text-bad">{error}</div>}
-        {values.plan && <PlanCard key={"plan" + runKey} plan={values.plan} awaiting={!!interrupt} onDecide={onDecide} autoApproveIn={autoApproveIn}
+        {values.plan && <PlanCard key={"plan" + runKey} plan={values.plan} awaiting={!!interrupt} onDecide={onDecide} onSubmitPlan={onSubmitPlan} autoApproveIn={autoApproveIn}
           collapsed={done.includes("fetch")} />}
-        {!!values.evidence?.length && <EvidenceList key={"ev" + runKey} evidence={values.evidence} collapsed={!!values.draft || !!finalReady} />}
+        {(!!values.evidence?.length || !!values.prior_evidence?.length) && done.includes("fetch") &&
+          <EvidenceList key={"ev" + runKey} evidence={values.evidence ?? []} prior={values.prior_evidence ?? []} collapsed={!!values.draft || !!finalReady} />}
         {values.charts?.map((c, i) => <ChartCard key={i} chart={c} />)}
         {values.draft && !finalReady && <Answer text={values.draft} draft streaming={active === "analyst"} />}
         {values.critique && <CriticCard critique={values.critique} revisions={values.revisions} />}
@@ -279,7 +297,7 @@ function Run({ values, active, done, interrupt, isLoading, error, onDecide, onAs
           <Answer text={textOf(lastAi!)} onFollowUp={demoQuestion ? undefined : onAsk}
             followUps={followUps(textOf(lastAi!), lastHuman ? textOf(lastHuman) : "")} />
         </div>}
-        {finalReady && <Trace timings={timings} values={values} />}
+        {finalReady && <Trace timings={timings} values={values} runId={runId} traceUrl={traceUrl} />}
         <div ref={anchor} aria-hidden className="h-px" />
         {isLoading && !interrupt && <div className="text-xs text-muted animate-pulse">running {active ?? "…"}</div>}
         {finalReady && demoQuestion && (

@@ -9,8 +9,43 @@ import { NextRequest } from "next/server";
 
 const TARGET = process.env.LANGGRAPH_API_URL ?? "http://127.0.0.1:2024";
 
+// Only what the research desk needs. Anything else (assistants CRUD, store writes, crons) is refused,
+// so a public deployment exposes a narrow surface even though the server behind it is general.
+const ALLOW: [RegExp, string[]][] = [
+  [/^info$/, ["GET"]],
+  [/^threads$/, ["POST"]],
+  [/^threads\/search$/, ["POST"]],
+  [/^threads\/[^/]+$/, ["GET"]],
+  [/^threads\/[^/]+\/state$/, ["GET"]],
+  [/^threads\/[^/]+\/history$/, ["GET", "POST"]],
+  [/^threads\/[^/]+\/runs(\/stream|\/wait)?$/, ["POST"]],
+  [/^threads\/[^/]+\/runs\/[^/]+(\/stream|\/join|\/cancel)?$/, ["GET", "POST"]],
+  [/^store\/items\/search$/, ["POST"]],
+  [/^assistants\/search$/, ["POST"]],
+];
+
+// Per-IP token bucket: generous for a demo, enough to stop a loop burning the model budget.
+// Lives per function instance; a global limiter would need a shared store.
+const BUCKET = new Map<string, { tokens: number; at: number }>();
+const RATE = { capacity: 30, refillPerSec: 0.25 }; // 30 requests, then one every 4s
+function allow(ip: string): boolean {
+  const now = Date.now();
+  const b = BUCKET.get(ip) ?? { tokens: RATE.capacity, at: now };
+  b.tokens = Math.min(RATE.capacity, b.tokens + ((now - b.at) / 1000) * RATE.refillPerSec);
+  b.at = now;
+  if (b.tokens < 1) { BUCKET.set(ip, b); return false; }
+  b.tokens -= 1; BUCKET.set(ip, b); return true;
+}
+
 async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
+  const joined = path.join("/");
+  const rule = ALLOW.find(([re]) => re.test(joined));
+  if (!rule || !rule[1].includes(req.method)) {
+    return Response.json({ error: "not_allowed", path: joined, method: req.method }, { status: 403 });
+  }
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  if (!allow(ip)) return Response.json({ error: "rate_limited" }, { status: 429, headers: { "retry-after": "4" } });
   const url = new URL(`${TARGET.replace(/\/$/, "")}/${path.join("/")}`);
   url.search = req.nextUrl.search;
 

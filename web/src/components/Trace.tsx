@@ -4,7 +4,7 @@ import type { AgentState, NodeName } from "@/lib/types";
 
 export type NodeTiming = { node: NodeName | "submitted" | "resumed"; at: number };
 
-export function Trace({ timings, values }: { timings: NodeTiming[]; values: AgentState }) {
+export function Trace({ timings, values, runId, traceUrl }: { timings: NodeTiming[]; values: AgentState; runId?: string | null; traceUrl?: string | null }) {
   const [open, setOpen] = useState(false);
   if (!timings.length) return null;
   const t0 = timings[0].at;
@@ -13,7 +13,11 @@ export function Trace({ timings, values }: { timings: NodeTiming[]; values: Agen
       <button className="card-h w-full text-left" onClick={() => setOpen((o) => !o)}>
         <span className="tag bg-line/60 text-fg">trace</span>
         <span className="text-sm text-muted">{timings.filter((t) => t.node !== "submitted" && t.node !== "resumed").length} nodes · {(((timings[timings.length - 1].at - t0) / 1000) || 0).toFixed(1)}s wall clock incl. review wait · {open ? "hide" : "show"} raw state</span>
+        {runId && <span className="ml-auto text-xs text-muted font-mono">run {runId.slice(0, 8)}</span>}
       </button>
+      {traceUrl && (
+        <div className="px-4 pt-2 text-xs"><a className="text-accent hover:underline" href={traceUrl} target="_blank" rel="noreferrer">Open this run in LangSmith ↗</a> <span className="text-muted">(every node, tool call, token count and latency)</span></div>
+      )}
       <ol className="px-4 py-2 text-xs font-mono grid grid-cols-[6rem_1fr] gap-x-3 gap-y-0.5">
         {timings.map((t, i) => {
           const prev = timings[i - 1];

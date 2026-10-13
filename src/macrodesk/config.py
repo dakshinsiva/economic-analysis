@@ -37,7 +37,13 @@ class Settings(BaseSettings):
         alias="ECON_MODEL",
     )
     max_tokens: int = Field(default=8000, alias="ECON_MAX_TOKENS")
+    # Optional cheaper/faster models for the planner and critic; default to `model`.
+    planner_model: str | None = Field(default=None, alias="ECON_PLANNER_MODEL")
+    critic_model: str | None = Field(default=None, alias="ECON_CRITIC_MODEL")
     log_level: str = Field(default="INFO", alias="ECON_LOG_LEVEL")
+
+    # Optional Postgres for the checkpointer and the Store (multi-machine deployments); SQLite otherwise.
+    database_url: str | None = Field(default=None, alias="DATABASE_URL")
 
     cache_dir: Path = PROJECT_ROOT / ".cache"
     log_dir: Path = PROJECT_ROOT / "logs"

@@ -1,18 +1,33 @@
 "use client";
 import { memo } from "react";
+import { useRef } from "react";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Chart } from "@/lib/types";
+import { chartToCsv, download, svgToPng } from "@/lib/export";
 
 const PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"];
 
 function ChartCardInner({ chart }: { chart: Chart }) {
+  const box = useRef<HTMLDivElement>(null);
+  const slug = chart.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+  const exportPng = async () => {
+    const svgs = box.current?.querySelectorAll("svg.recharts-surface") ?? [];
+    let i = 0;
+    for (const svg of Array.from(svgs)) {
+      download(`${slug}-${chart.panels[i]?.id ?? i}.png`, await svgToPng(svg as SVGSVGElement), "image/png"); i++;
+    }
+  };
   return (
     <section className="card border-l-4 border-l-chart">
       <header className="card-h">
         <span className="tag bg-chart/15 text-chart">chart</span>
         <span className="text-sm">{chart.title}</span>
+        <span className="ml-auto flex gap-1">
+          <button className="btn text-xs" onClick={() => download(`${slug}.csv`, chartToCsv(chart), "text/csv")}>csv</button>
+          <button className="btn text-xs" onClick={exportPng}>png</button>
+        </span>
       </header>
-      <div className="px-2 pb-2">
+      <div className="px-2 pb-2" ref={box}>
         {chart.panels.map((p, i) => {
           const data = p.points.map((pt) => ({ t: new Date(pt.d).getTime(), v: pt.v }));
           const last = p.points[p.points.length - 1];

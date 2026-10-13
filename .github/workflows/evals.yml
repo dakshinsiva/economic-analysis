@@ -1,0 +1,36 @@
+name: evals (nightly)
+
+on:
+  schedule:
+    - cron: "17 3 * * *"   # 03:17 UTC daily
+  workflow_dispatch:
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    # Needs repository secrets: FRED_API_KEY, ANTHROPIC_API_KEY, LANGSMITH_API_KEY (optional ANTHROPIC_BASE_URL, ECON_MODEL).
+    # The job skips itself when the keys are absent so forks stay green.
+    env:
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+      ECON_MODEL: ${{ secrets.ECON_MODEL }}
+      LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+      LANGSMITH_TRACING: "true"
+      LANGSMITH_PROJECT: macrodesk-evals
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen
+      - name: critic evals (deterministic layer, always)
+        run: uv run python evals/run_critic_evals.py
+      - name: end-to-end evals (skipped without keys)
+        if: env.FRED_API_KEY != '' && env.ANTHROPIC_API_KEY != ''
+        run: uv run python evals/run_evals.py ${{ env.LANGSMITH_API_KEY != '' && '--langsmith' || '' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: evals/*results-*.json
