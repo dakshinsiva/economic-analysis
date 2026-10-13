@@ -80,18 +80,19 @@ someone ask in English and still get something they can sign.
 
 ## Limitations
 
-- **Scope.** FRED only; 24 curated series plus search; no non-US macro, no
-  company data, and no data vintages. "What was known in March, before the
-  revision" cannot be answered without ALFRED support.
+- **Scope.** FRED only; 24 curated series plus search; no non-US macro and no
+  company data. Vintages are covered (`series_as_of`, `revision_history`), so
+  "what was known in March" is answerable, but only for series ALFRED tracks.
 - **Description, not forecasting.** The agent reports and cautiously
   interprets. It builds no models, runs no backtests, and the critic checks
   numbers, not economic logic: a well-cited but wrong-headed argument passes.
-- **The critic is partial.** It verifies citations exactly and uncited figures
-  approximately. Derived claims beyond simple arithmetic are not checked, the
-  model half still has false positives and negatives, and after two rejections
+- **The critic is partial.** It verifies citations and numbers exactly
+  (including scaled values, differences, sums and percent changes) and leaves
+  prose claims to the model layer, which is scoped so it cannot overrule a
+  verified number. Economic reasoning is not checked, and after two rejections
   the answer ships with the issues attached rather than being withheld.
-- **Latency and cost.** Three to five model calls and 40 to 90 seconds per
-  answer at the default effort. This is a research tool, not a chat toy.
+- **Latency and cost.** Three to five model calls and 10 to 45 seconds per
+  answer with concurrent fetching. This is a research tool, not a chat toy.
 - **The human step is both the safeguard and the bottleneck.** Auto-approval
   exists for batch use and removes the safeguard.
 - **Memory is deliberately thin.** Only plan-review feedback is remembered, as
@@ -99,8 +100,11 @@ someone ask in English and still get something they can sign.
 - **Deployment.** Persistence is SQLite on one machine. The hosted page is a
   replay unless a LangGraph server is attached, because the backend is Python
   and the FRED key must stay server-side.
-- **Evidence base.** Six eval cases are enough to catch regressions and not
-  enough to quote a reliable false-rejection rate for the critic.
+- **Evidence base.** Twenty-four end-to-end cases and a ten-draft labelled set
+  for the critic are enough to catch regressions and to measure the critic's
+  layers (all at precision 1.0 and recall 1.0 on that set), and still small:
+  a few hundred labelled drafts would make the false-rejection rate a real
+  statistic rather than a count.
 - **Model dependence.** Prompts were tuned against one Claude model behind one
   gateway. A different model or effort setting needs the evals re-run.
 - **Data caveats carry through.** FRED release lags, seasonal adjustment and

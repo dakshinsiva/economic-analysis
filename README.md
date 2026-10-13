@@ -113,9 +113,27 @@ From a run on 2026-10-13, *"What does the latest JOLTS report say about the labo
 > retrieved window (from 2021-01-01); the all-time peak date was not retrieved.*
 
 The caveat is the point: the analyst had the window summary but not the peak's date, said so, and the
-critic let it through. The eval harness scores six such questions on series coverage, tool choice,
-regex-verified grounding and critic approval; the first run found two bugs the unit tests had passed
-over, which is also written up.
+critic let it through. (It is also why `extremes` now exists: a peak comes with its date.)
+
+## Measured
+
+The eval harness runs 24 questions, including adversarial ones, through the real graph and model
+and scores each on four things. Latest run, 2026-10-13, recorded in LangSmith as experiment
+`macrodesk-v2-ec14ed3e`:
+
+| score | mean | what it checks |
+|---|---|---|
+| `tools_ok` | 1.00 | expected tools present, forbidden tools absent |
+| `citations_grounded` | 1.00 | every `(SERIES, date)` exists in the fetched evidence (deterministic) |
+| `critic_approved` | 1.00 | the final draft passed the critic within two revisions |
+| `series_coverage` | 0.98 | expected series present in the plan (one case fetched one of two) |
+
+The critic itself is measured separately on labelled drafts (`evals/run_critic_evals.py --llm`):
+the deterministic layer, the model layer and the combined gate each score precision 1.00 and
+recall 1.00 on that set. It did not start there: the model layer measured 0.71 precision until
+verified numbers were allowed to overrule it (debugging note 20). The first eval run also found
+two bugs the unit tests had passed over (notes 11 and 12). Typical answer latency is now 10 to
+45 seconds with the fetch steps running concurrently.
 
 ## Running it
 
