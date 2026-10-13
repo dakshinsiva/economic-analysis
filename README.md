@@ -152,6 +152,8 @@ Inside the CLI: `/state`, `/history`, `/replay N` (time travel to a checkpoint),
 
 ## Deploying the desk
 
+Step-by-step for a live backend behind the hosted site: [docs/06-live-backend.md](docs/06-live-backend.md).
+
 The Next.js app deploys to Vercel as is. Point `LANGGRAPH_API_URL` and `LANGSMITH_API_KEY` at a
 LangSmith Deployment of this graph for a live backend, or set `NEXT_PUBLIC_DEMO=1` for the replay.
 `FRED_API_KEY` on the server enables the live dashboard; without it the recorded snapshot is shown.
