@@ -3,7 +3,11 @@
   "id": "ok_cited_and_derived",
   "truth": "approve",
   "det_reject": false,
-  "det_issues": []
+  "det_issues": [],
+  "llm_reject": false,
+  "llm_issues": [],
+  "overruled": [],
+  "combined_reject": false
  },
  {
   "id": "unit_error_thousands",
@@ -11,7 +15,15 @@
   "det_reject": true,
   "det_issues": [
    "Unit error: '7,180,420 thousand' multiplies a value that the evidence already gives in thousands."
-  ]
+  ],
+  "llm_reject": true,
+  "llm_issues": [
+   "\"against a mean of 7,180,420 thousand over the window\" \u2014 the evidence states the mean is 7,180.42 (in thousands), not 7,180,420 thousand. The draft inflates the mean by a factor of 1,000, misreading the already-thousands-denominated figure as if it needed to be multiplied further."
+  ],
+  "overruled": [
+   "\"against a mean of 7,180,420 thousand over the window\" \u2014 the evidence states the mean is 7,180.42 (in thousands), not 7,180,420 thousand. The draft inflates the mean by a factor of 1,000, misreading the already-thousands-denominated figure as if it needed to be multiplied further."
+  ],
+  "combined_reject": true
  },
  {
   "id": "memory_peak_uncited",
@@ -19,7 +31,13 @@
   "det_reject": true,
   "det_issues": [
    "The number 3.0 % does not appear in the evidence and is not a difference or percent change between evidence values."
-  ]
+  ],
+  "llm_reject": true,
+  "llm_issues": [
+   "\"far below its 3.0% peak in late 2021\" \u2014 the evidence window only covers 2023-09-01 to 2026-08-01 and shows a maximum of 2.30% within that window. No 2021 data was retrieved, and no 3.0% peak figure appears anywhere in the evidence. This is an unsupported historical comparison."
+  ],
+  "overruled": [],
+  "combined_reject": true
  },
  {
   "id": "wrong_date_cited",
@@ -27,19 +45,35 @@
   "det_reject": true,
   "det_issues": [
    "Cites (UNRATE, 2026-10-01) but date 2026-10-01 does not appear in the evidence."
-  ]
+  ],
+  "llm_reject": true,
+  "llm_issues": [
+   "\"Unemployment was 4.2% in September (UNRATE, 2026-10-01).\" \u2014 The date cited is 2026-10-01, but the evidence shows the September reading is dated 2026-09-01. No data point dated 2026-10-01 appears in the evidence."
+  ],
+  "overruled": [
+   "\"Unemployment was 4.2% in September (UNRATE, 2026-10-01).\" \u2014 The date cited is 2026-10-01, but the evidence shows the September reading is dated 2026-09-01. No data point dated 2026-10-01 appears in the evidence."
+  ],
+  "combined_reject": true
  },
  {
   "id": "ok_percent_of_target_from_question",
   "truth": "approve",
   "det_reject": false,
-  "det_issues": []
+  "det_issues": [],
+  "llm_reject": false,
+  "llm_issues": [],
+  "overruled": [],
+  "combined_reject": false
  },
  {
   "id": "ok_counts_and_years",
   "truth": "approve",
   "det_reject": false,
-  "det_issues": []
+  "det_issues": [],
+  "llm_reject": false,
+  "llm_issues": [],
+  "overruled": [],
+  "combined_reject": false
  },
  {
   "id": "series_not_fetched",
@@ -48,13 +82,23 @@
   "det_issues": [
    "Cites (UNRATE, 2026-09-01) but no evidence for series UNRATE was fetched.",
    "The number 4.2 % does not appear in the evidence and is not a difference or percent change between evidence values."
-  ]
+  ],
+  "llm_reject": true,
+  "llm_issues": [
+   "\"while unemployment is 4.2% (UNRATE, 2026-09-01)\" \u2014 no UNRATE data appears anywhere in the evidence; neither the value 4.2% nor the date 2026-09-01 is present or derivable from the provided evidence."
+  ],
+  "overruled": [],
+  "combined_reject": true
  },
  {
   "id": "ok_qualified_window_peak",
   "truth": "approve",
   "det_reject": false,
-  "det_issues": []
+  "det_issues": [],
+  "llm_reject": false,
+  "llm_issues": [],
+  "overruled": [],
+  "combined_reject": false
  },
  {
   "id": "fabricated_level",
@@ -63,12 +107,24 @@
   "det_issues": [
    "Cites (ICSA, 2026-01-10) but date 2026-01-10 does not appear in the evidence.",
    "The number 182,000 does not appear in the evidence and is not a difference or percent change between evidence values."
-  ]
+  ],
+  "llm_reject": true,
+  "llm_issues": [
+   "\"the lowest since the 182,000 print in January (ICSA, 2026-01-10)\" \u2014 neither the 182,000 value nor the 2026-01-10 date appears anywhere in the evidence; the evidence contains only two data points (207,000 on 2026-09-26 and 197,000 on 2026-10-03), so no historical comparison to a January reading is supportable."
+  ],
+  "overruled": [
+   "\"the lowest since the 182,000 print in January (ICSA, 2026-01-10)\" \u2014 neither the 182,000 value nor the 2026-01-10 date appears anywhere in the evidence; the evidence contains only two data points (207,000 on 2026-09-26 and 197,000 on 2026-10-03), so no historical comparison to a January reading is supportable."
+  ],
+  "combined_reject": true
  },
  {
   "id": "ok_change_in_pp",
   "truth": "approve",
   "det_reject": false,
-  "det_issues": []
+  "det_issues": [],
+  "llm_reject": false,
+  "llm_issues": [],
+  "overruled": [],
+  "combined_reject": false
  }
 ]

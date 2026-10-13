@@ -274,7 +274,11 @@ neither present in the evidence nor derivable from it by simple arithmetic.
     nowhere; a "series low" claim when the evidence shows a lower value; a unit error such as reporting a value
     given in thousands as if it were units (7,437.97 thousand is NOT 7,437,970 thousand).
   - Supported (do NOT flag): differences, percentage-point gaps vs a stated target, counts like "5 of the 6
-    readings", min/max/mean quoted from the evidence's summary line, and qualitative interpretation.
+    readings" or "five of the six readings" that you can verify by counting the listed values, ranges whose ends
+    are listed values, min/max/mean quoted from the evidence's summary line, a percentage computed from two
+    evidence values (e.g. "42% below the 12,301 maximum" when both numbers are present), and qualitative
+    interpretation. A maximum or minimum described as "in the window shown" or with a note that the exact date
+    was not retrieved is supported by the summary line.
 When the evidence shows a window (e.g. "latest 6") treat "peak"/"low" claims as supported if the draft says
 "in the window shown" or similar; flag them only if stated as all-time without qualification.
 
@@ -327,6 +331,7 @@ def _derived(nums: list[float]) -> tuple[set[float], set[float]]:
         for b in nums[i + 1:]:
             if a != b:  # a zero difference is not a derivation, and it would match tiny scaled values
                 diffs.add(round(abs(a - b), 3))
+            diffs.add(round(a + b, 3))  # "prior quarter = latest minus a negative change" is a sum
             if b:
                 pcts.add(round(abs(a / b - 1) * 100, 2))
             if a:
@@ -390,6 +395,39 @@ def _numeric_checks(draft: str, evidence: list[dict[str, Any]], question: str = 
     return issues[:6]
 
 
+def _verified_numbers(draft: str, evidence: list[dict[str, Any]], question: str) -> set[str]:
+    """Raw number tokens in the draft that the deterministic layer accepts."""
+    flagged = {m.group(1) for i in _numeric_checks(draft, evidence, question) for m in [re.search(r"number ([-+\d.,]+)|'([-+\d.,]+) thousand'", i)] if m}
+    clean = _SERIES_RE.sub(" ", _DATE_RE.sub(" ", draft))
+    return {m.group() for m in _NUMBER_RE.finditer(clean)} - flagged
+
+
+_QUOTED_RE = re.compile(r'[“"]([^”"]{8,}?)[”"]')
+_SELF_RESOLVED_RE = re.compile(r"\b(no issue|not an issue|is correct|is supportable|is reasonable and supportable)\b", re.I)
+
+
+def _overrule(llm_issues: list[str], verified: set[str]) -> tuple[list[str], list[str]]:
+    """Drop model objections that are only about numbers the deterministic layer verified.
+    The model layer keeps authority over prose claims (trends, causes, uncited history); the
+    deterministic layer keeps authority over numbers it can check exactly. Only the sentence the
+    critic quotes from the draft is examined, not the numbers the critic introduces while
+    explaining; an objection that ends by saying there is no issue is dropped as self-resolved."""
+    kept, overruled = [], []
+    for issue in llm_issues:
+        if _SELF_RESOLVED_RE.search(issue):
+            overruled.append(issue)
+            continue
+        quoted = _QUOTED_RE.search(issue)
+        target = quoted.group(1) if quoted else issue
+        nums = [m.group() for m in _NUMBER_RE.finditer(_SERIES_RE.sub(" ", _DATE_RE.sub(" ", target)))]
+        nums = [x for x in nums if not (("." not in x and "," not in x) and (float(x) <= 60 or 1900 <= float(x) <= 2100))]
+        if nums and all(x in verified for x in nums):
+            overruled.append(issue)
+        else:
+            kept.append(issue)
+    return kept, overruled
+
+
 def critic(state: AgentState) -> dict[str, Any]:
     evidence = _all_evidence(state)
     issues = _deterministic_checks(state["draft"], evidence)
@@ -399,10 +437,11 @@ def critic(state: AgentState) -> dict[str, Any]:
         SystemMessage(CRITIC_SYSTEM),
         HumanMessage(CRITIC_USER.format(evidence=_format_evidence(evidence), draft=state["draft"])),
     ])
-    issues += verdict.issues
-    approved = verdict.approved and not issues
+    llm_kept, overruled = _overrule(verdict.issues, _verified_numbers(state["draft"], evidence, _last_user_text(state)))
+    issues += llm_kept
+    approved = not issues  # the model's `approved` is informative; the issue list is the gate
     log_event("critic.verdict", approved=approved, n_issues=len(issues), issues=issues,
-              deterministic=len(issues) - len(verdict.issues))
+              deterministic=len(issues) - len(llm_kept), overruled=overruled)
     return {"critique": Critique(approved=approved, issues=issues).model_dump(),
             "revisions": state.get("revisions", 0) + 1}
 

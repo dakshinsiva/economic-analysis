@@ -38,7 +38,9 @@ def main() -> None:
                                                      HumanMessage(nodes.CRITIC_USER.format(evidence=nodes._format_evidence(ev), draft=c["draft"]))])
             row["llm_reject"] = not v.approved or bool(v.issues)
             row["llm_issues"] = v.issues
-            row["combined_reject"] = row["det_reject"] or row["llm_reject"]
+            kept, overruled = nodes._overrule(v.issues, nodes._verified_numbers(c["draft"], ev, c.get("question", "")))
+            row["overruled"] = overruled
+            row["combined_reject"] = row["det_reject"] or bool(kept)   # what the graph's gate does
         rows.append(row)
         mark = lambda k: ("REJECT" if row.get(k) else "approve") if k in row else "-"
         print(f"{c['id']:32} truth={c['verdict']:7} det={mark('det_reject'):7} llm={mark('llm_reject'):7} combined={mark('combined_reject')}")

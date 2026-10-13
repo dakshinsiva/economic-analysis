@@ -228,6 +228,27 @@ zero differences; apply scaling only above a magnitude.
 positives are visible immediately (they block answers); false negatives are
 invisible until you measure them.
 
+## 20. The model critic measured at precision 0.71
+**Symptom.** With the deterministic number check at precision 1.0 and recall
+1.0 on the labelled set, the model layer still rejected two correct drafts:
+"five of the six readings are at or above 3%" (true, by counting) and "42%
+below the 12,301 maximum in the window shown" (true, by arithmetic, and
+qualified). Because either layer could reject, the combined gate inherited the
+model's false positives, and the end-to-end evals showed it: four of 24
+answers shipped with a reviewer note after two rejections.
+**Cause.** A model judge applies a rubric unevenly; prompt examples lowered
+the rate but did not fix it. Both layers were given equal authority over a
+domain where one of them is exact.
+**Fix.** Authority by competence. The deterministic layer verifies every
+number it can; a model objection whose numbers are all verified is overruled
+and logged. The model keeps authority over prose claims (trends, causes,
+uncited history), which the regex cannot judge. Re-measured: model and
+combined layers at precision 1.0, recall 1.0 on the labelled set.
+**Lesson.** When you have an exact check and a judgement check for the same
+facts, do not OR them. Let the exact one decide what it can decide, and scope
+the judge to the rest. And measure the judge; the two false positives were
+invisible until `run_critic_evals.py --llm` put a number on them.
+
 ## Toolkit cheat-sheet
 
 | Question | Tool |

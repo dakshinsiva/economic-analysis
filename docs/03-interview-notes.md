@@ -39,3 +39,25 @@
   `SqliteStore` on a shared connection did not. (Debugging note 11.)
 
 See also [04-reflections.md](04-reflections.md): what I learned, the market, the limitations.
+
+## The "build everything" pass
+- **Deterministic beats judged, where possible.** The numeric grounding check is a
+  few dozen lines of regex and arithmetic. Calibrated on twenty recorded drafts
+  (zero false positives) and measured on a labelled set (precision 1.0, recall
+  1.0 for the deterministic layer). The model critic still matters for prose
+  claims; the deterministic layer makes the gate predictable.
+- **Validate at the tool boundary.** Structured output guaranteed a well-formed
+  plan and still produced an impossible step. The fix was the tool's own schema,
+  applied before execution, with one retry.
+- **Context is not evidence.** Showing the analyst the previous answer taught it
+  to cite the previous answer. Carrying forward the previous *evidence* fixed the
+  behaviour and made follow-ups cheaper.
+- **Vintages change the product.** `series_as_of` and `revision_history` let the
+  desk answer "what was known then" and "how much was it revised", which is the
+  question practitioners actually argue about.
+- **Persistence is an interface.** SQLite and Postgres behind one factory; the
+  graph never knew which it had. Verified against a real Postgres in Docker, after
+  two SQLite transaction bugs taught me not to trust in-memory doubles.
+- **A public API surface should be narrow.** The passthrough allows nine endpoint
+  shapes and rate-limits by IP; the general server behind it stays general.
+

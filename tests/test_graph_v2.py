@@ -212,3 +212,24 @@ def test_prior_evidence_carries_into_follow_up(monkeypatch, fake_fred):
     follow = g.invoke({"messages": [HumanMessage("and vs last year?")]}, CFG)
     assert follow["evidence"] == [] and follow["prior_evidence"][0]["prior"] and follow["prior_evidence"][0]["tool"] == "get_series"
     assert "JTSQUR" in nodes._format_evidence(nodes._all_evidence(follow))
+
+
+def test_deterministic_layer_overrules_model_objections_about_verified_numbers():
+    ev = _ev("PCEPILFE yoy\n2026-03-01  3.11\n2026-04-01  3.08\n2026-05-01  3.16\n2026-06-01  3.04\n2026-07-01  2.98\n2026-08-01  3.01")
+    draft = "Five of the six readings are at or above 3% and the range is 2.98% to 3.16% (PCEPILFE, 2026-08-01)."
+    verified = nodes._verified_numbers(draft, ev, "")
+    kept, overruled = nodes._overrule(["'range is 2.98% to 3.16%' is a derived claim", "The draft asserts a rising trend that the data do not show"], verified)
+    assert overruled == ["'range is 2.98% to 3.16%' is a derived claim"]
+    assert kept == ["The draft asserts a rising trend that the data do not show"]
+
+
+def test_overrule_examines_only_the_quoted_draft_sentence_and_drops_self_resolved():
+    ev = _ev("A191RL1Q225SBEA [Percent, SAAR]\n2026-04-01  2.20\nchange -0.30 vs 1 obs ago")
+    draft = "Real GDP grew 2.2% in Q1 2026, down from 2.5% the prior quarter (A191RL1Q225SBEA, 2026-04-01)."
+    verified = nodes._verified_numbers(draft, ev, "")
+    assert "2.5" in verified  # a sum of two evidence numbers
+    issues = ['"down from 2.5% the prior quarter" — the evidence shows 2.20 and -0.30; the prior quarter is derived as 2.20 + 0.30 = 2.50, which',
+              '"Initial claims: 197 thousand" — 197,000 equals 197 thousand. No issue.',
+              '"the weakest reading since the COVID trough" — the evidence does not support this claim']
+    kept, overruled = nodes._overrule(issues, verified)
+    assert kept == [issues[2]] and len(overruled) == 2
