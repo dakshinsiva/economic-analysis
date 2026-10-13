@@ -16,7 +16,7 @@ from langgraph.types import interrupt
 
 from econ_agent.models import make_model
 from econ_agent.logging import log_event
-from econ_agent.memory import recall_feedback, remember_feedback
+from econ_agent.memory import current_user_id, recall_feedback, remember_feedback
 from econ_agent.state import AgentState, Critique, Evidence, Plan
 from econ_agent.tools import ALL_TOOLS
 
@@ -67,12 +67,13 @@ Available tools:
 def planner(state: AgentState, runtime: Runtime) -> dict[str, Any]:
     question = _last_user_text(state)
     feedback = state.get("plan_feedback")
-    remembered = recall_feedback(runtime.store)
+    user_id = current_user_id()
+    remembered = recall_feedback(runtime.store, user_id)
     prefs = ""
     if remembered:
         prefs = ("Feedback this user gave on earlier plans (apply when relevant to this question):\n"
                  + "\n".join(f"- {r}" for r in remembered))
-    log_event("planner.recall", n_prefs=len(remembered))
+    log_event("planner.recall", user_id=user_id, n_prefs=len(remembered))
     prompt = [SystemMessage(PLANNER_SYSTEM.format(catalog=_tool_catalog(), prefs=prefs)), HumanMessage(question)]
     if feedback and state.get("plan"):
         prompt.append(AIMessage(f"Previous plan: {Plan.model_validate(state['plan']).model_dump_json()}"))
@@ -97,7 +98,7 @@ def review(state: AgentState, runtime: Runtime) -> dict[str, Any]:
         log_event("review.approved")
         return {"plan_feedback": None}
     log_event("review.feedback", feedback=decision)
-    remember_feedback(runtime.store, str(decision))
+    remember_feedback(runtime.store, str(decision), current_user_id())
     return {"plan_feedback": str(decision)}
 
 

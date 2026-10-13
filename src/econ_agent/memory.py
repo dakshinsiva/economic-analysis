@@ -11,6 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
+from langgraph.config import get_config
 from langgraph.store.base import BaseStore
 
 NAMESPACE_ROOT = "prefs"
@@ -19,6 +20,15 @@ DEFAULT_USER = "default"
 
 def namespace(user_id: str = DEFAULT_USER) -> tuple[str, str]:
     return (NAMESPACE_ROOT, user_id)
+
+
+def current_user_id() -> str:
+    """Read `configurable.user_id` from the running graph's config (per-thread
+    configuration). Outside a graph run, or when unset, use the default user."""
+    try:
+        return get_config().get("configurable", {}).get("user_id") or DEFAULT_USER
+    except Exception:  # not inside a runnable
+        return DEFAULT_USER
 
 
 def remember_feedback(store: BaseStore | None, text: str, user_id: str = DEFAULT_USER) -> None:

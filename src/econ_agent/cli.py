@@ -2,7 +2,9 @@
 
     uv run econ "Is the labor market cooling? Use JOLTS."   # one-shot
     uv run econ                                               # REPL
-    uv run econ --thread my-thread                            # resume a thread
+    uv run econ --thread jolts-oct                            # resume (or start) a named thread
+    uv run econ --last                                        # resume the most recent thread
+    uv run econ --user alice                                  # per-user memory namespace
     uv run econ --v1 "..."                                    # Stage 1 ReAct agent
     uv run econ --auto-approve "..."                          # skip plan review
     uv run econ brief                                         # write outputs/brief-<date>.md
@@ -14,7 +16,11 @@ Debug commands inside the REPL:
     /state          show the current checkpoint's state summary
     /history        list checkpoints for this thread (newest first)
     /replay N       re-run from the Nth checkpoint in /history (time travel)
-    /thread new     start a fresh thread id
+    /threads               list threads (newest first)
+    /thread <name>         switch to (or create) a thread
+    /thread new [name]     start a fresh thread
+    /thread rename <name>  rename the current thread
+    /thread delete <name>  delete a thread's checkpoints
     /prefs          show remembered plan feedback (long-term memory)
     /forget         clear remembered plan feedback
     /quit
@@ -42,14 +48,20 @@ from econ_agent.config import get_settings
 from econ_agent.brief import run_brief
 from econ_agent.graph import build_graph, build_graph_v2
 from econ_agent.memory import forget_all, recall_feedback
+from econ_agent.threads import delete_thread, latest_thread_id, list_threads, rename_thread
 from econ_agent.logging import log_event, setup_logging
 
 console = Console()
 AUTO_APPROVE = False
 
 
+USER_ID = "default"
+
+
 def _cfg(thread_id: str, checkpoint_id: str | None = None) -> dict[str, Any]:
-    c: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
+    """Per-run configuration. thread_id selects the checkpoint lineage; user_id
+    selects the long-term memory namespace. Both are plain `configurable` keys."""
+    c: dict[str, Any] = {"configurable": {"thread_id": thread_id, "user_id": USER_ID}}
     if checkpoint_id:
         c["configurable"]["checkpoint_id"] = checkpoint_id
     return c
@@ -154,7 +166,16 @@ def list_history(graph, thread_id: str) -> list[Any]:
     return hist
 
 
-def repl(graph, thread_id: str, store=None) -> None:
+def show_threads(graph, saver) -> None:
+    t = Table(title="threads (newest first)")
+    t.add_column("thread"); t.add_column("updated"); t.add_column("steps"); t.add_column("msgs"); t.add_column("first question")
+    for th in list_threads(saver, graph):
+        t.add_row(th.thread_id, th.updated.strftime("%Y-%m-%d %H:%M") if th.updated else "-",
+                  str(th.steps), str(th.messages), th.first_question)
+    console.print(t)
+
+
+def repl(graph, thread_id: str, store=None, saver=None) -> None:
     console.print(Panel(f"econ agent - thread [bold]{thread_id}[/]  (type /help)", border_style="blue"))
     hist: list[Any] = []
     while True:
@@ -190,10 +211,33 @@ def repl(graph, thread_id: str, store=None) -> None:
                                 title="[bold]remembered plan feedback", border_style="blue"))
         elif line == "/forget":
             console.print(f"forgot {forget_all(store)} item(s)")
-        elif line == "/thread new":
-            thread_id = uuid.uuid4().hex[:8]
+        elif line == "/threads":
+            show_threads(graph, saver)
+        elif line.startswith("/thread"):
+            parts = line.split(maxsplit=2)
+            sub = parts[1] if len(parts) > 1 else ""
+            if sub == "new":
+                thread_id = parts[2].strip() if len(parts) > 2 else uuid.uuid4().hex[:8]
+            elif sub == "rename" and len(parts) == 3:
+                try:
+                    rename_thread(saver, thread_id, parts[2].strip())
+                    thread_id = parts[2].strip()
+                except NotImplementedError as e:
+                    console.print(f"[red]{e}[/]"); continue
+            elif sub == "delete" and len(parts) == 3:
+                target = parts[2].strip()
+                delete_thread(saver, target)
+                console.print(f"deleted thread [bold]{target}[/]")
+                if target == thread_id:
+                    thread_id = uuid.uuid4().hex[:8]
+                else:
+                    continue
+            elif sub and sub not in ("new", "rename", "delete"):
+                thread_id = sub
+            else:
+                console.print("usage: /thread <name> | new [name] | rename <name> | delete <name>"); continue
             setup_logging(get_settings().log_dir, thread_id)
-            console.print(f"new thread [bold]{thread_id}[/]")
+            console.print(f"thread [bold]{thread_id}[/]")
         else:
             run_turn(graph, thread_id, line)
 
@@ -201,17 +245,21 @@ def repl(graph, thread_id: str, store=None) -> None:
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="econ", description="FRED economic-analysis agent")
     p.add_argument("question", nargs="*", help="one-shot question; omit for REPL")
-    p.add_argument("--thread", default=None, help="thread id to resume (default: new)")
+    p.add_argument("--thread", default=None, help="thread name/id to resume or create (default: new random id)")
+    p.add_argument("--last", action="store_true", help="resume the most recently updated thread")
+    p.add_argument("--user", default="default", help="user id for long-term memory namespace")
     p.add_argument("--v1", action="store_true", help="use the Stage 1 prebuilt ReAct agent instead of the Stage 2 graph")
     p.add_argument("--auto-approve", action="store_true", help="skip the plan review prompt (Stage 2)")
     args = p.parse_args(argv)
 
     settings = get_settings()
-    thread_id = args.thread or uuid.uuid4().hex[:8]
-    setup_logging(settings.log_dir, thread_id, settings.log_level)
+    global USER_ID
+    USER_ID = args.user
 
     conn = sqlite3.connect(str(settings.checkpoint_db), check_same_thread=False)
     saver = SqliteSaver(conn)
+    thread_id = args.thread or (args.last and latest_thread_id(saver)) or uuid.uuid4().hex[:8]
+    setup_logging(settings.log_dir, thread_id, settings.log_level)
     # The store gets its OWN connection: SqliteStore and SqliteSaver both manage
     # transactions, and sharing one connection raises "cannot start a transaction
     # within a transaction" the first time a node touches the store mid-run
@@ -230,7 +278,7 @@ def main(argv: list[str] | None = None) -> None:
         run_turn(graph, thread_id, " ".join(args.question))
         console.print(f"[dim]thread {thread_id}  -  resume with: uv run econ --thread {thread_id}[/]")
     else:
-        repl(graph, thread_id, store)
+        repl(graph, thread_id, store, saver)
 
 
 if __name__ == "__main__":

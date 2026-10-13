@@ -133,6 +133,16 @@ deterministic checks where possible (the regex citation check never
 misfires), give the judge precise rubric boundaries, and measure its false
 rejection rate with evals before trusting it as a gate.
 
+## 13. `copy_thread` exists on the base class but not in SQLite
+**Symptom.** `/thread rename` raised `NotImplementedError` from inside
+`SqliteSaver.copy_thread` even though `hasattr(saver, "copy_thread")` was true.
+**Cause.** The abstract base declares the method; the SQLite saver inherits the
+raising default. Capability checks by attribute name lie for ABCs.
+**Fix.** Rename via `UPDATE ... SET thread_id` on the `checkpoints` and
+`writes` tables, guarded by a duplicate-name check; non-SQLite savers refuse.
+**Lesson.** Test against the real backend, and prefer a try/except around the
+operation over `hasattr` for optional capabilities.
+
 ## Toolkit cheat-sheet
 
 | Question | Tool |

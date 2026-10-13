@@ -70,7 +70,9 @@ uv run econ --v1 "..."                                  # Stage 1 ReAct agent
 uv run econ brief                                       # daily brief -> outputs/brief-<date>.md
 uv run python evals/run_evals.py [--langsmith]          # eval harness
 uv run econ                                             # REPL
-uv run econ --thread d4b30282                           # resume a thread
+uv run econ --thread jolts-oct                          # resume or start a named thread
+uv run econ --last                                      # resume the most recent thread
+uv run econ --user alice                                # separate memory namespace per user
 uv run langgraph dev                                    # LangGraph Studio
 uv run pytest                                           # offline tests
 ```
@@ -80,6 +82,8 @@ uv run pytest                                           # offline tests
 - **Terminal panels**: every tool call and result is printed as it streams.
 - **`/state`, `/history`, `/replay N`**: inspect the SQLite checkpointer and
   time-travel to an earlier checkpoint.
+- **`/threads`, `/thread <name|new|rename|delete>`**: manage conversations;
+  `--user` scopes long-term memory per person.
 - **`logs/run-<thread>.jsonl`**: structured events (FRED latency, cache hits,
   node updates, token usage). Works offline.
 - **LangGraph Studio** (`langgraph dev`): step through nodes visually; `econ_agent_v2` pauses at `review` and resumes from the UI.

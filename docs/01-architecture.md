@@ -100,3 +100,20 @@ experiment so prompt changes are comparable over time.
 (labor, rates, growth/inflation) with auto-approved plans and writes
 `outputs/brief-<date>.md` with embedded charts. Deterministic questions make it
 schedulable and comparable day to day.
+
+## Threads and per-thread configuration
+
+Everything about "which conversation" and "which user" is carried in
+`config["configurable"]`, not in state or code:
+
+| key | selects | set by |
+|---|---|---|
+| `thread_id` | the checkpoint lineage (conversation) | `--thread NAME`, `--last`, `/thread ...` |
+| `user_id` | the long-term memory namespace `("prefs", user_id)` | `--user NAME` |
+| `checkpoint_id` | a specific past checkpoint to resume/fork from | `/replay N` |
+
+`threads.py` adds what the checkpointer API leaves out: list (newest first,
+with first question and message count), rename (`copy_thread` + delete) and
+delete. Thread ids are free-form strings, so readable names are the convention.
+Nodes read `user_id` with `langgraph.config.get_config()`, which works for the
+CLI, the REST API and Studio alike.
