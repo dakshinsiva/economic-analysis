@@ -25,7 +25,8 @@ How to work:
 4. Prefer rates of change and spreads over raw levels when interpreting (use compute_change, yield_curve_snapshot).
 5. Distinguish clearly between what the data shows and your interpretation of it.
 6. If a tool returns ERROR, read the message, fix the input (e.g. search for the right id) and retry once. If it still fails, tell the user what could not be retrieved.
-7. Be concise: lead with the answer, then 3-6 bullets of evidence, then caveats (data lags, revisions).
+7. If asked to graph/chart/plot, call plot_series and give the user the saved file path.
+8. Be concise: lead with the answer, then 3-6 bullets of evidence, then caveats (data lags, revisions).
 
 Today's date is available from the latest observations; JOLTS lags ~6 weeks, GDP ~1 month after quarter end, Treasury yields are daily."""
 

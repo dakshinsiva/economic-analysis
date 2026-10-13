@@ -18,7 +18,8 @@ from typing import Optional
 import pandas as pd
 from langchain_core.tools import tool
 
-from econ_agent.config import get_settings
+from econ_agent.charts import plot_small_multiples
+from econ_agent.config import PROJECT_ROOT, get_settings
 from econ_agent.fred.client import FredClient, FredError
 from econ_agent.fred.series import REGISTRY, TOPICS, by_topic
 
@@ -198,5 +199,46 @@ def recession_periods(since: str = "1990-01-01") -> str:
     return "NBER recessions: " + ("; ".join(periods) if periods else "none in window")
 
 
+@tool
+def plot_series(series_ids: list[str], start: Optional[str] = None, title: Optional[str] = None) -> str:
+    """Render a PNG line chart of one or more FRED series (one panel per series, shared time axis)
+    with NBER recession shading. Returns the file path to tell the user, plus what was plotted.
+    Use when the user asks to graph, chart, plot, or visualise. Max 6 series.
+    """
+    ids = [i.upper() for i in series_ids][:6]
+    if start is None:
+        start = (date.today() - timedelta(days=5 * 365)).isoformat()
+    data, errors = {}, []
+    for sid in ids:
+        try:
+            data[sid] = _client().get_series(sid, start)
+        except FredError as e:
+            errors.append(str(e))
+    if not data:
+        return "ERROR: " + " | ".join(errors)
+    try:
+        rec = _client().get_series("USREC", start)
+        spans, a = [], None
+        for d, v in rec.items():
+            if v == 1 and a is None:
+                a = d
+            elif v == 0 and a is not None:
+                spans.append((a, d)); a = None
+        if a is not None:
+            spans.append((a, rec.index[-1]))
+    except FredError:
+        spans = []
+    units = {sid: _units(sid) for sid in data}
+    titles = {sid: (REGISTRY[sid].title if sid in REGISTRY else "") for sid in data}
+    path = plot_small_multiples(data, units, titles, PROJECT_ROOT / "outputs",
+                                title or ", ".join(data), spans)
+    summary = "; ".join(f"{sid} {s.index[0].date()}..{s.index[-1].date()} latest {_fmt(float(s.iloc[-1]))} {units[sid]}"
+                        for sid, s in data.items())
+    out = f"Chart saved to {path}\nPlotted: {summary}"
+    if errors:
+        out += "\nWARNINGS: " + " | ".join(errors)
+    return out
+
+
 ALL_TOOLS = [list_known_series, search_fred, get_series, compute_change, compare_series,
-             yield_curve_snapshot, recession_periods]
+             yield_curve_snapshot, recession_periods, plot_series]

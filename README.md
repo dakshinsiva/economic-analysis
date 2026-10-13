@@ -24,7 +24,8 @@ START -> model -> (tool calls?) -> tools -> model -> ... -> END
 | Settings | `src/econ_agent/config.py` | env/.env -> one `Settings` object; nothing else reads `os.environ` |
 | Data | `src/econ_agent/fred/client.py` | cached, error-normalising wrapper over `fredapi` |
 | Registry | `src/econ_agent/fred/series.py` | 24 curated series with units + "how to read it" |
-| Tools | `src/econ_agent/tools.py` | 7 `@tool`s returning compact, citable text |
+| Tools | `src/econ_agent/tools.py` | 8 `@tool`s returning compact, citable text (incl. `plot_series` -> PNG) |
+| Charts | `src/econ_agent/charts.py` | matplotlib small multiples with recession shading; files land in `outputs/` |
 | Graph | `src/econ_agent/graph.py` | `create_agent` ReAct loop; `graph` for Studio, `build_graph()` for CLI |
 | CLI | `src/econ_agent/cli.py` | rich REPL with `/state`, `/history`, `/replay` |
 | Logs | `src/econ_agent/logging.py` | JSONL per thread in `logs/` |

@@ -42,3 +42,12 @@ def test_recession_periods(fake_fred):
 
 def test_search_fred_formats_rows(fake_fred):
     assert "JTSQUR" in search_fred.invoke({"query": "quits"})
+
+
+def test_plot_series_writes_png(fake_fred, tmp_path, monkeypatch):
+    from econ_agent import tools
+    monkeypatch.setattr(tools, "PROJECT_ROOT", tmp_path)
+    out = tools.plot_series.invoke({"series_ids": ["JTSJOL", "JTSQUR", "BOGUS"], "title": "JOLTS test"})
+    assert "Chart saved to" in out and "WARNINGS" in out
+    png = next((tmp_path / "outputs").glob("*.png"))
+    assert png.stat().st_size > 10_000
