@@ -52,6 +52,19 @@ expression would have invoked the graph twice per turn.
 **Fix.** Plain nested loop over `graph.stream(..., stream_mode="updates")`.
 **Lesson.** `stream()` is lazy; every iteration of a new generator is a new run.
 
+## 6. Studio run failed: "messages: at least one message is required"
+**Symptom.** First run from LangGraph Studio errored inside the `model` node
+with an Anthropic 400, preceded by `UserWarning: Received only system message(s)`.
+**Cause.** The run was submitted with an empty `messages` list. Studio's input
+form starts empty; Submit without adding a message sends `{"messages": []}`,
+so the only thing reaching the API was the system prompt.
+**How found.** The warning names the exact shape of the request. Reproduced with
+`curl POST /runs/wait` using `{"messages": []}` (fails) vs one user message (works).
+**Fix.** In Studio, click **+ Message**, type the question, then Submit. No code
+change needed; a planner node in Stage 2 will validate input explicitly.
+**Lesson.** Read the *warning* just above the traceback. The provider SDK often
+tells you what it sent before the server tells you why it refused.
+
 ## Toolkit cheat-sheet
 
 | Question | Tool |
