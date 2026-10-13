@@ -5,6 +5,7 @@
     uv run econ --thread my-thread                            # resume a thread
     uv run econ --v1 "..."                                    # Stage 1 ReAct agent
     uv run econ --auto-approve "..."                          # skip plan review
+    uv run econ brief                                         # write outputs/brief-<date>.md
 
 Stage 2 graphs pause after planning: press Enter to approve the plan, or type
 feedback (e.g. "use 10 years of history") to re-plan.
@@ -14,6 +15,8 @@ Debug commands inside the REPL:
     /history        list checkpoints for this thread (newest first)
     /replay N       re-run from the Nth checkpoint in /history (time travel)
     /thread new     start a fresh thread id
+    /prefs          show remembered plan feedback (long-term memory)
+    /forget         clear remembered plan feedback
     /quit
 """
 
@@ -28,6 +31,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.store.sqlite import SqliteStore
 from langgraph.types import Command
 from rich.console import Console
 from rich.markdown import Markdown
@@ -35,7 +39,9 @@ from rich.panel import Panel
 from rich.table import Table
 
 from econ_agent.config import get_settings
+from econ_agent.brief import run_brief
 from econ_agent.graph import build_graph, build_graph_v2
+from econ_agent.memory import forget_all, recall_feedback
 from econ_agent.logging import log_event, setup_logging
 
 console = Console()
@@ -148,7 +154,7 @@ def list_history(graph, thread_id: str) -> list[Any]:
     return hist
 
 
-def repl(graph, thread_id: str) -> None:
+def repl(graph, thread_id: str, store=None) -> None:
     console.print(Panel(f"econ agent - thread [bold]{thread_id}[/]  (type /help)", border_style="blue"))
     hist: list[Any] = []
     while True:
@@ -178,6 +184,12 @@ def repl(graph, thread_id: str) -> None:
             console.print(f"[magenta]replaying from checkpoint {snap.config['configurable']['checkpoint_id'][-12:]} "
                           f"(next={snap.next})[/]")
             run_turn(graph, thread_id, None, snap.config["configurable"]["checkpoint_id"])
+        elif line == "/prefs":
+            prefs = recall_feedback(store)
+            console.print(Panel("\n".join(f"- {p}" for p in prefs) or "(nothing remembered yet)",
+                                title="[bold]remembered plan feedback", border_style="blue"))
+        elif line == "/forget":
+            console.print(f"forgot {forget_all(store)} item(s)")
         elif line == "/thread new":
             thread_id = uuid.uuid4().hex[:8]
             setup_logging(get_settings().log_dir, thread_id)
@@ -200,15 +212,25 @@ def main(argv: list[str] | None = None) -> None:
 
     conn = sqlite3.connect(str(settings.checkpoint_db), check_same_thread=False)
     saver = SqliteSaver(conn)
-    graph = build_graph(checkpointer=saver) if args.v1 else build_graph_v2(checkpointer=saver)
+    # The store gets its OWN connection: SqliteStore and SqliteSaver both manage
+    # transactions, and sharing one connection raises "cannot start a transaction
+    # within a transaction" the first time a node touches the store mid-run
+    # (debugging note 11).
+    store = SqliteStore(sqlite3.connect(str(settings.checkpoint_db), check_same_thread=False))
+    store.setup()
+    graph = build_graph(checkpointer=saver) if args.v1 else build_graph_v2(checkpointer=saver, store=store)
     global AUTO_APPROVE
     AUTO_APPROVE = args.auto_approve
 
-    if args.question:
+    if args.question and args.question[0] == "brief":
+        AUTO_APPROVE = True
+        path = run_brief(graph, thread_id, run_turn)
+        console.print(f"[green]brief written to {path}[/]")
+    elif args.question:
         run_turn(graph, thread_id, " ".join(args.question))
         console.print(f"[dim]thread {thread_id}  -  resume with: uv run econ --thread {thread_id}[/]")
     else:
-        repl(graph, thread_id)
+        repl(graph, thread_id, store)
 
 
 if __name__ == "__main__":

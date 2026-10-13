@@ -41,8 +41,13 @@ START -> model -> (tool calls?) -> tools -> model -> ... -> END
 | Graph v2 | `src/econ_agent/graph.py`, `nodes.py`, `state.py` | planner / review / fetch / analyst / critic / finalize |
 | CLI | `src/econ_agent/cli.py` | rich REPL with `/state`, `/history`, `/replay` |
 | Logs | `src/econ_agent/logging.py` | JSONL per thread in `logs/` |
+| Memory | `src/econ_agent/memory.py` | Store-backed plan preferences across threads (`/prefs`, `/forget`) |
+| Brief | `src/econ_agent/brief.py` | `econ brief` -> `outputs/brief-<date>.md` with charts |
+| Evals | `evals/cases.yaml`, `evals/run_evals.py` | scores plans, grounding and critic; `--langsmith` runs an experiment |
 
-Roadmap: Stage 3 adds long-term memory, evals, and a scheduled brief. See `docs/`.
+**Stage 3:** long-term memory of your plan feedback (LangGraph Store), an eval
+harness with LangSmith experiments, and `econ brief` for a daily markdown report.
+See `docs/`.
 
 ## Setup
 
@@ -62,6 +67,8 @@ gateway.
 uv run econ "Is the yield curve inverted right now?"   # one-shot; pauses for plan approval
 uv run econ --auto-approve "..."                        # skip the review prompt
 uv run econ --v1 "..."                                  # Stage 1 ReAct agent
+uv run econ brief                                       # daily brief -> outputs/brief-<date>.md
+uv run python evals/run_evals.py [--langsmith]          # eval harness
 uv run econ                                             # REPL
 uv run econ --thread d4b30282                           # resume a thread
 uv run langgraph dev                                    # LangGraph Studio

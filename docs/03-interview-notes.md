@@ -27,3 +27,13 @@
 - **Cost of Stage 2.** Three model calls minimum (planner, analyst, critic)
   vs one or two for v1. Worth it when correctness matters more than latency;
   `--v1` stays available for quick lookups.
+
+## Stage 3 additions
+- **Checkpointer vs Store.** Thread memory vs user memory; different lifetimes,
+  different namespaces. The only thing stored is plan feedback, which is both
+  high-signal and cheap to apply.
+- **Evals before trust.** The critic looked great in demos and still rejected
+  correct arithmetic 1 time in 6. You find that with a harness, not by reading
+  transcripts. Scores live next to the code and in LangSmith experiments.
+- **Integration bugs hide behind convenient doubles.** `InMemoryStore` passed;
+  `SqliteStore` on a shared connection did not. (Debugging note 11.)

@@ -11,10 +11,12 @@ import re
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langgraph.runtime import Runtime
 from langgraph.types import interrupt
 
 from econ_agent.models import make_model
 from econ_agent.logging import log_event
+from econ_agent.memory import recall_feedback, remember_feedback
 from econ_agent.state import AgentState, Critique, Evidence, Plan
 from econ_agent.tools import ALL_TOOLS
 
@@ -57,14 +59,21 @@ that will gather ALL the evidence needed to answer the question. Rules:
   so that the analyst never has to rely on memory.
 - Prefer compute_change for growth rates and yield_curve_snapshot for curve questions.
 - Include plot_series only if the user asks for a chart/graph/plot.
+{prefs}
 Available tools:
 {catalog}"""
 
 
-def planner(state: AgentState) -> dict[str, Any]:
+def planner(state: AgentState, runtime: Runtime) -> dict[str, Any]:
     question = _last_user_text(state)
     feedback = state.get("plan_feedback")
-    prompt = [SystemMessage(PLANNER_SYSTEM.format(catalog=_tool_catalog())), HumanMessage(question)]
+    remembered = recall_feedback(runtime.store)
+    prefs = ""
+    if remembered:
+        prefs = ("Feedback this user gave on earlier plans (apply when relevant to this question):\n"
+                 + "\n".join(f"- {r}" for r in remembered))
+    log_event("planner.recall", n_prefs=len(remembered))
+    prompt = [SystemMessage(PLANNER_SYSTEM.format(catalog=_tool_catalog(), prefs=prefs)), HumanMessage(question)]
     if feedback and state.get("plan"):
         prompt.append(AIMessage(f"Previous plan: {Plan.model_validate(state['plan']).model_dump_json()}"))
         prompt.append(HumanMessage(f"Revise the plan with this feedback: {feedback}"))
@@ -74,8 +83,9 @@ def planner(state: AgentState) -> dict[str, Any]:
             "revisions": 0}
 
 
-def review(state: AgentState) -> dict[str, Any]:
-    """Human-in-the-loop. Pauses the graph; resume with Command(resume='approve') or free text feedback."""
+def review(state: AgentState, runtime: Runtime) -> dict[str, Any]:
+    """Human-in-the-loop. Pauses the graph; resume with Command(resume='approve') or free text feedback.
+    Feedback is also written to long-term memory so future plans start from it."""
     plan = Plan.model_validate(state["plan"])
     decision = interrupt({
         "type": "plan_review",
@@ -87,6 +97,7 @@ def review(state: AgentState) -> dict[str, Any]:
         log_event("review.approved")
         return {"plan_feedback": None}
     log_event("review.feedback", feedback=decision)
+    remember_feedback(runtime.store, str(decision))
     return {"plan_feedback": str(decision)}
 
 
@@ -141,10 +152,22 @@ def analyst(state: AgentState) -> dict[str, Any]:
     return {"draft": draft}
 
 
-CRITIC_SYSTEM = """You are a strict fact-checker. Compare the DRAFT against the EVIDENCE.
-Flag any sentence that states a number, date, level, peak, average, range, or historical comparison that is NOT
-present in the evidence (e.g. 'peaked near 12 million in 2022' when no 2022 data was fetched). Quote the sentence.
-Interpretation and qualitative reasoning are fine. Approve only if every quantitative claim is evidence-backed."""
+CRITIC_SYSTEM = """You are a strict but fair fact-checker. Compare the DRAFT against the EVIDENCE.
+
+FLAG a sentence only if it states a number, date, level, peak, average, range, or historical comparison that is
+neither present in the evidence nor derivable from it by simple arithmetic.
+  - Unsupported: "peaked near 12 million in 2022" when no 2022 data was fetched; a date or value that appears
+    nowhere; a "series low" claim when the evidence shows a lower value; a unit error such as reporting a value
+    given in thousands as if it were units (7,437.97 thousand is NOT 7,437,970 thousand).
+  - Supported (do NOT flag): differences, percentage-point gaps vs a stated target, counts like "5 of the 6
+    readings", min/max/mean quoted from the evidence's summary line, and qualitative interpretation.
+When the evidence shows a window (e.g. "latest 6") treat "peak"/"low" claims as supported if the draft says
+"in the window shown" or similar; flag them only if stated as all-time without qualification.
+
+Output rules: `issues` must contain ONLY genuine problems, each quoting the offending sentence and saying what
+the evidence actually shows. Never include an entry that says there is no issue. If `issues` is empty,
+`approved` must be true; if it is non-empty, `approved` must be false. Double-check your own arithmetic
+before flagging a number."""
 
 CRITIC_USER = """EVIDENCE:
 {evidence}

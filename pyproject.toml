@@ -25,6 +25,7 @@ dev = [
     "pytest>=8",
     "langgraph-cli[inmem]>=0.4",
     "grandalf>=0.8",
+    "pyyaml>=6.0.3",
 ]
 
 [build-system]

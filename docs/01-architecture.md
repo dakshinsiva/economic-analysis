@@ -80,3 +80,23 @@ Design decisions worth defending:
 
 Tests: `tests/test_graph_v2.py` scripts the three LLM factories and asserts on
 routing (pause at review, re-plan on feedback, bounce on rejection, cap).
+
+## Stage 3 additions
+
+**Long-term memory (`memory.py`).** Checkpoints remember a thread; the Store
+remembers the user. Feedback typed at plan review is written to the Store
+namespace `("prefs", user)`; the planner reads it back on every new thread and
+applies it when relevant. CLI: `/prefs`, `/forget`. In Studio the server
+supplies the Store.
+
+**Evals (`evals/`).** `cases.yaml` holds questions with expected series and
+tools. `run_evals.py` runs each through the v2 graph with a fresh in-memory
+checkpointer and store, scores `series_coverage`, `tools_ok`,
+`citations_grounded` (regex) and `critic_approved`, writes
+`results-<date>.json`, and with `--langsmith` uploads the dataset and runs an
+experiment so prompt changes are comparable over time.
+
+**Brief (`brief.py`).** `econ brief` runs a fixed three-question playbook
+(labor, rates, growth/inflation) with auto-approved plans and writes
+`outputs/brief-<date>.md` with embedded charts. Deterministic questions make it
+schedulable and comparable day to day.

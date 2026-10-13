@@ -100,3 +100,22 @@ def test_fetch_records_tool_errors_without_crashing(fake_fred):
                                  Step(tool="get_series", args={"series_id": "JTSQUR"}, why="w")])
     out = nodes.fetch({"plan": plan.model_dump()})
     assert [e["ok"] for e in out["evidence"]] == [False, True]
+
+
+def test_review_feedback_is_remembered_and_recalled_next_thread(monkeypatch, fake_fred):
+    from langgraph.store.memory import InMemoryStore
+    from econ_agent.memory import recall_feedback
+
+    planner = Canned(PLAN)
+    _wire(monkeypatch, planner, Canned(AIMessage("ok")), Canned(Critique(approved=True)))
+    store = InMemoryStore()
+    g = build_graph_v2(InMemorySaver(), store=store)
+
+    g.invoke({"messages": [HumanMessage("q")]}, CFG)
+    g.invoke(Command(resume="always use 10 years of history"), CFG)  # feedback -> remembered
+    assert recall_feedback(store) == ["always use 10 years of history"]
+
+    cfg2 = {"configurable": {"thread_id": "t2"}}
+    g.invoke({"messages": [HumanMessage("another question")]}, cfg2)
+    system_prompt = str(planner.calls[-1][0].content)
+    assert "always use 10 years of history" in system_prompt  # new thread, memory applied

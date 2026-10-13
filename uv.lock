@@ -502,6 +502,7 @@ dev = [
     { name = "grandalf" },
     { name = "langgraph-cli", extra = ["inmem"] },
     { name = "pytest" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
@@ -524,6 +525,7 @@ dev = [
     { name = "grandalf", specifier = ">=0.8" },
     { name = "langgraph-cli", extras = ["inmem"], specifier = ">=0.4" },
     { name = "pytest", specifier = ">=8" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
 [[package]]

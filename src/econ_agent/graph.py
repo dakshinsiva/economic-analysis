@@ -11,6 +11,7 @@ Two entry points on purpose:
 from __future__ import annotations
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.store.base import BaseStore
 
 from econ_agent.models import make_model
 from econ_agent.tools import ALL_TOOLS
@@ -49,7 +50,7 @@ graph = build_graph()
 # --------------------------------------------------------------------------- #
 # Stage 2: explicit StateGraph with human-in-the-loop and a critic loop.
 # --------------------------------------------------------------------------- #
-def build_graph_v2(checkpointer: BaseCheckpointSaver | None = None):
+def build_graph_v2(checkpointer: BaseCheckpointSaver | None = None, store: BaseStore | None = None):
     from langgraph.graph import END, START, StateGraph
 
     from econ_agent import nodes
@@ -70,7 +71,7 @@ def build_graph_v2(checkpointer: BaseCheckpointSaver | None = None):
     g.add_edge("analyst", "critic")
     g.add_conditional_edges("critic", nodes.route_after_critic, {"analyst": "analyst", "finalize": "finalize"})
     g.add_edge("finalize", END)
-    return g.compile(checkpointer=checkpointer, name="econ_agent_v2")
+    return g.compile(checkpointer=checkpointer, store=store, name="econ_agent_v2")
 
 
 graph_v2 = build_graph_v2()

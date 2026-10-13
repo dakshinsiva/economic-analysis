@@ -104,6 +104,35 @@ in the evidence and the critic was right to approve.
 **Lesson.** Inspect state before blaming the model. The checkpoint made the
 verification a 20-line script instead of a re-run.
 
+## 11. `cannot start a transaction within a transaction` from the Store
+**Symptom.** `econ brief` died in the `planner` node with a sqlite3
+OperationalError the first time a node read the Store. Unit tests were green.
+**Cause.** `SqliteSaver` and `SqliteStore` were built on the same
+`sqlite3.Connection`. The checkpointer holds a transaction open around a step;
+the store then issues its own `BEGIN`. The tests used `InMemoryStore`, so they
+never exercised the real pairing.
+**Fix.** Give the store its own connection to the same file.
+**Lesson.** Two libraries managing transactions must not share a connection.
+And a test double that is *too* convenient can hide an integration bug;
+the eval run caught it, the unit tests could not.
+
+## 12. The critic rejects correct arithmetic (and sometimes miscalculates)
+**Symptom.** Eval case `core_inflation` was rejected twice. Reading the
+critique: it flagged "5 of the 6 readings at or above 3%" (true, derived from
+the six listed values), listed one item that ended "No issue here", and in one
+place did its own subtraction wrong.
+**But also.** In the JOLTS case the same critic caught a real unit error
+(7,437.97 thousand written as 7,437,970 thousand) and a false "lowest level"
+claim. The critic is valuable *and* noisy.
+**Fix.** Prompt now defines supported vs unsupported explicitly (derivable
+arithmetic is fine), forbids non-issue entries, and ties `approved` to an
+empty issue list. Tool output labels units on the summary line to prevent the
+unit error at the source.
+**Lesson.** An LLM judge is another model that can be wrong. Prefer
+deterministic checks where possible (the regex citation check never
+misfires), give the judge precise rubric boundaries, and measure its false
+rejection rate with evals before trusting it as a gate.
+
 ## Toolkit cheat-sheet
 
 | Question | Tool |
@@ -116,3 +145,5 @@ verification a 20-line script instead of a re-run.
 | Visual step-through | `uv run langgraph dev` -> Studio |
 | Hosted traces, token costs | `LANGSMITH_TRACING=true` |
 | Deterministic repro without the API | `tests/test_graph.py` scripted model pattern |
+| Did a prompt change help or hurt? | `uv run python evals/run_evals.py` before and after |
+| What does the agent remember about me? | `/prefs` in the REPL (Store namespace `prefs`) |

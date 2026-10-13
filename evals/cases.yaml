@@ -1,0 +1,25 @@
+# Each case: the question, the FRED series the plan should fetch (any order),
+# tools that must / must not appear. Scoring is in evals/run_evals.py.
+- id: jolts_latest
+  question: "What does the latest JOLTS report say about the labor market?"
+  expected_series: [JTSJOL, JTSQUR]
+  forbid_tools: [plot_series]
+- id: quits_yoy
+  question: "How has the quits rate changed over the past year?"
+  expected_series: [JTSQUR]
+  expect_tools: [compute_change]
+- id: yield_curve
+  question: "Is the yield curve inverted right now?"
+  expected_series: []
+  expect_tools: [yield_curve_snapshot]
+- id: gdp_growth
+  question: "What was real GDP growth in the most recent quarter?"
+  expected_series: [A191RL1Q225SBEA]
+- id: core_inflation
+  question: "Is core inflation still above the Fed's 2% target?"
+  expected_series: [PCEPILFE]
+  expect_tools: [compute_change]
+- id: unemployment_chart
+  question: "Plot the unemployment rate over the last five years."
+  expected_series: [UNRATE]
+  expect_tools: [plot_series]

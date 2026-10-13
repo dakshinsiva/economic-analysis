@@ -99,7 +99,7 @@ def get_series(series_id: str, start: Optional[str] = None, end: Optional[str] =
     return (
         f"{sid}: {title} [{_units(sid)}]\n"
         f"window {s.index[0].date()} to {s.index[-1].date()} ({len(s)} obs); "
-        f"min {_fmt(s.min())}, max {_fmt(s.max())}, mean {_fmt(s.mean())}\n"
+        f"min {_fmt(s.min())}, max {_fmt(s.max())}, mean {_fmt(s.mean())} (all in {_units(sid)})\n"
         f"latest {last_n}:\n{_tail_table(s, last_n)}"
     )
 
