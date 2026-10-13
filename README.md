@@ -158,7 +158,7 @@ LangSmith Deployment of this graph for a live backend, or set `NEXT_PUBLIC_DEMO=
 
 ## Debugging log
 
-Fifteen incidents so far, each with the symptom, how it was localised and the fix:
+Sixteen incidents so far, each with the symptom, how it was localised and the fix:
 a native wheel that tried to compile Rust, a gateway that silently rewrote the model endpoint, a
 400 from a prompt with no user turn (twice: once in Studio, once in my own critic), a circular
 import, Pydantic objects in checkpointed state, a critic that rejected correct arithmetic, two

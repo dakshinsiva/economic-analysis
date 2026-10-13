@@ -264,7 +264,9 @@ def main(argv: list[str] | None = None) -> None:
     # transactions, and sharing one connection raises "cannot start a transaction
     # within a transaction" the first time a node touches the store mid-run
     # (debugging note 11).
-    store = SqliteStore(sqlite3.connect(str(settings.checkpoint_db), check_same_thread=False))
+    # isolation_level=None (autocommit) is required: with Python's default, setup() on a fresh
+    # file leaves an implicit transaction open and the store's next BEGIN fails (debugging note 16).
+    store = SqliteStore(sqlite3.connect(str(settings.checkpoint_db), check_same_thread=False, isolation_level=None))
     store.setup()
     graph = build_graph(checkpointer=saver) if args.v1 else build_graph_v2(checkpointer=saver, store=store)
     global AUTO_APPROVE

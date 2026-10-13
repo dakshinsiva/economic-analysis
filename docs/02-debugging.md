@@ -164,6 +164,27 @@ per-segment `revalidate` export with `fetch(..., { next: { revalidate } })` and
 **Lesson.** Framework defaults move; read the generated config before reaching for
 a pattern from memory.
 
+## 16. The Store transaction bug came back on a fresh database
+**Symptom.** After renaming the project I moved the old checkpoint file aside.
+The very next CLI run failed in `planner` with the same
+"cannot start a transaction within a transaction" as note 11, now on the
+Store's *own* connection.
+**Cause.** Python's `sqlite3` default `isolation_level=""` opens an implicit
+transaction before the first write. `SqliteStore.setup()` writes migration
+rows on a brand-new file and leaves that implicit transaction open; the
+store's next operation issues an explicit `BEGIN` and SQLite refuses. On the
+old file the migrations already existed, so `setup()` wrote nothing and the
+bug stayed hidden for a day.
+**How found.** Reproduced in ten lines on a temp file with both isolation
+settings; then read `SqliteStore.from_conn_string`, which passes
+`isolation_level=None`.
+**Fix.** Open the store's connection with `isolation_level=None`, as the
+library does for itself.
+**Lesson.** When a library offers a `from_conn_string` constructor, read it
+before building the connection yourself: the arguments it chooses are the
+contract. And a fix verified only against existing state is half verified;
+test on an empty one too.
+
 ## Toolkit cheat-sheet
 
 | Question | Tool |
