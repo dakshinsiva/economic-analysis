@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useStream } from "@langchain/langgraph-sdk/react";
 import type { Thread } from "@langchain/langgraph-sdk";
 import { Pipeline } from "./Pipeline";
@@ -125,6 +126,7 @@ function Shell({ mode, sidebar, children }: { mode: "live" | "demo"; sidebar: Re
       {sidebar}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="border-b border-line px-5 py-3 flex items-center gap-3 flex-wrap">
+          <Image src="/logo.svg" alt="" width={26} height={26} priority />
           <h1 className="font-semibold tracking-tight">{APP_NAME}</h1>
           <span className="text-muted text-sm hidden sm:inline">{APP_TAGLINE}</span>
           <span className={`ml-auto tag ${mode === "live" ? "bg-ok/15 text-ok" : "bg-plan/15 text-plan"}`}>
