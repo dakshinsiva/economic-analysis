@@ -1,10 +1,11 @@
 "use client";
+import { memo } from "react";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Chart } from "@/lib/types";
 
 const PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"];
 
-export function ChartCard({ chart }: { chart: Chart }) {
+function ChartCardInner({ chart }: { chart: Chart }) {
   return (
     <section className="card border-l-4 border-l-chart">
       <header className="card-h">
@@ -50,3 +51,5 @@ export function ChartCard({ chart }: { chart: Chart }) {
     </section>
   );
 }
+
+export const ChartCard = memo(ChartCardInner);

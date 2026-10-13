@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type { Plan } from "@/lib/types";
 
-export function PlanCard({ plan, awaiting, onDecide, autoApproveIn, collapsed: collapsedDefault = false }:
+function PlanCardInner({ plan, awaiting, onDecide, autoApproveIn, collapsed: collapsedDefault = false }:
   { plan: Plan; awaiting: boolean; onDecide?: (d: string) => void; autoApproveIn?: number; collapsed?: boolean }) {
   const [fb, setFb] = useState("");
   const [override, setOverride] = useState<boolean | null>(null);
@@ -65,3 +65,5 @@ export function PlanCard({ plan, awaiting, onDecide, autoApproveIn, collapsed: c
     </section>
   );
 }
+
+export const PlanCard = memo(PlanCardInner);

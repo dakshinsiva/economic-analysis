@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type { Indicator } from "@/lib/indicators";
 import demo from "@/demo/indicators.json";
 
@@ -16,7 +16,7 @@ function Spark({ pts, color }: { pts: number[]; color: string }) {
 
 const fmt = (v: number, u: string) => (u === "k" ? Math.round(v).toLocaleString() : v.toFixed(2)) + (u === "k" ? "k" : u === "%" ? "%" : u === "pp" ? " pp" : "");
 
-export function Dashboard({ mode, onAsk, open, onToggle }:
+function DashboardInner({ mode, onAsk, open, onToggle }:
   { mode: "live" | "demo"; onAsk: (q: string) => void; open: boolean; onToggle: () => void }) {
   type Snap = { asOf: string; indicators: Indicator[]; recorded?: boolean };
   const [data, setData] = useState<Snap | null>(mode === "demo" ? { ...(demo as Snap), recorded: true } : null);
@@ -62,3 +62,5 @@ export function Dashboard({ mode, onAsk, open, onToggle }:
     </section>
   );
 }
+
+export const Dashboard = memo(DashboardInner);

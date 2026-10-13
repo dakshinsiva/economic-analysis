@@ -50,9 +50,9 @@ export function useDemo() {
     mark("fetch"); setDone(["planner", "review", "fetch"]); setActive("analyst");
     // Type the draft out in word-sized chunks, as the live analyst streams tokens.
     const words = (DEMO.draft ?? "").split(/(\s+)/);
-    for (let i = 0; i < words.length; i += 3) {
-      setValues((v) => ({ ...v, draft: words.slice(0, i + 3).join("") }));
-      await wait(28);
+    for (let i = 0; i < words.length; i += 14) {
+      setValues((v) => ({ ...v, draft: words.slice(0, i + 14).join("") }));
+      await wait(45);
     }
     setValues((v) => ({ ...v, draft: DEMO.draft })); mark("analyst");
     setDone(["planner", "review", "fetch", "analyst"]); setActive("critic"); await wait(1500); mark("critic");

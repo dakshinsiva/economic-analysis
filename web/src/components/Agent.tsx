@@ -223,6 +223,7 @@ function Run({ values, active, done, interrupt, isLoading, error, onDecide, onAs
   // following keeps the newest card in view rather than racing to the page bottom.
   const scroller = useRef<HTMLElement>(null);
   const anchor = useRef<HTMLDivElement>(null);
+  const answerRef = useRef<HTMLDivElement>(null);
   const [following, setFollowing] = useState(true);
   const followRef = useRef(true);
   const setFollow = (v: boolean) => { followRef.current = v; setFollowing(v); };
@@ -234,8 +235,13 @@ function Run({ values, active, done, interrupt, isLoading, error, onDecide, onAs
   const scrollToAnchor = () => anchor.current?.scrollIntoView({ block: "end", behavior: "smooth" });
   const contentSig = `${values.plan?.goal}|${values.evidence?.length}|${values.charts?.length}|${Math.floor((values.draft?.length ?? 0) / 80)}|${values.critique?.approved}|${msgs.length}|${active}|${interrupt ? 1 : 0}`;
   useEffect(() => {
-    if (followRef.current) scrollToAnchor();
-  }, [contentSig]);
+    if (!followRef.current) return;
+    // While the run streams, keep the newest card in view. When the final answer
+    // lands, pan to its top so it is read from the beginning, not from the footer.
+    if (finalReady && answerRef.current) answerRef.current.scrollIntoView({ block: "start", behavior: "smooth" });
+    else scrollToAnchor();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentSig, !!finalReady]);
   const onScroll = () => { if (!followRef.current && anchorVisible()) setFollow(true); };
   const onWheel = (e: React.WheelEvent) => { if (e.deltaY < 0 && followRef.current) setFollow(false); };
   const onTouchMove = () => { if (followRef.current) setFollow(false); };
@@ -269,8 +275,10 @@ function Run({ values, active, done, interrupt, isLoading, error, onDecide, onAs
         {values.charts?.map((c, i) => <ChartCard key={i} chart={c} />)}
         {values.draft && !finalReady && <Answer text={values.draft} draft streaming={active === "analyst"} />}
         {values.critique && <CriticCard critique={values.critique} revisions={values.revisions} />}
-        {finalReady && <Answer text={textOf(lastAi!)} onFollowUp={demoQuestion ? undefined : onAsk}
-          followUps={followUps(textOf(lastAi!), lastHuman ? textOf(lastHuman) : "")} />}
+        {finalReady && <div ref={answerRef} className="scroll-mt-3">
+          <Answer text={textOf(lastAi!)} onFollowUp={demoQuestion ? undefined : onAsk}
+            followUps={followUps(textOf(lastAi!), lastHuman ? textOf(lastHuman) : "")} />
+        </div>}
         {finalReady && <Trace timings={timings} values={values} />}
         <div ref={anchor} aria-hidden className="h-px" />
         {isLoading && !interrupt && <div className="text-xs text-muted animate-pulse">running {active ?? "…"}</div>}

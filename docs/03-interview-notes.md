@@ -37,3 +37,5 @@
   transcripts. Scores live next to the code and in LangSmith experiments.
 - **Integration bugs hide behind convenient doubles.** `InMemoryStore` passed;
   `SqliteStore` on a shared connection did not. (Debugging note 11.)
+
+See also [04-reflections.md](04-reflections.md): what I learned, the market, the limitations.

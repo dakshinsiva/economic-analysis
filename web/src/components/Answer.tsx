@@ -22,7 +22,7 @@ export function Answer({ text, draft, onFollowUp, followUps, streaming }:
     <section className={`card border-l-4 ${draft ? "border-l-muted" : "border-l-accent"}`}>
       <header className="card-h">
         <span className={`tag ${draft ? "bg-muted/15 text-muted" : "bg-accent/15 text-accent"}`}>{draft ? "draft" : "answer"}</span>
-        {draft ? <span className="text-sm text-muted">{streaming ? "writing from the evidence…" : "awaiting the critic"}</span> : <span className="text-sm text-muted">every figure cites (series, date); links open FRED</span>}
+        {draft ? <span className="text-sm text-muted">{streaming ? "writing from the evidence…" : "awaiting the critic"}</span> : <span className="text-sm text-muted hidden md:inline">every figure cites (series, date); links open FRED</span>}
         {!draft && (
           <span className="ml-auto flex gap-1">
             <button className="btn text-xs" onClick={() => { navigator.clipboard.writeText(clean); setCopied(true); setTimeout(() => setCopied(false), 1200); }}>{copied ? "copied" : "copy md"}</button>

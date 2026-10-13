@@ -156,6 +156,29 @@ LangSmith Deployment of this graph for a live backend, or set `NEXT_PUBLIC_DEMO=
 - **Memory is narrow on purpose.** Only plan-review feedback is persisted. It is high-signal because a
   person just said it was worth saying, and cheap to apply.
 
+## What I learned, who it is for, what it cannot do
+
+The short version; the full write-up is [docs/04-reflections.md](docs/04-reflections.md).
+
+**Learned.** Grounding is verified, not prompted: the first version cited a
+2022 peak from memory, and only a critic made that detectable. Make the plan
+data and put the human before the cost. Be deterministic wherever a model is
+not needed; the regex check never misfires, the model critic had to be measured
+before it could be trusted. Tool output design beats prompt wording. Fourteen
+of sixteen logged failures were environmental, not the model. Convenient test
+doubles hide integration bugs; the eval harness caught what unit tests could not.
+
+**For.** People who have to defend a number: research associates and
+economists writing client notes, policy analysts, journalists and students who
+know the concept but not the series id, and teams that need an audit trail of
+plan, evidence and verdict. The pattern transfers to any source with stable
+identifiers and release dates; FRED is the demonstration.
+
+**Limits.** FRED only, no data vintages, description not forecasting, a critic
+that checks numbers not economic logic, 40 to 90 seconds per answer, a human
+review step that is both the safeguard and the bottleneck, thin memory by
+design, single-machine persistence, six eval cases, one model tuned.
+
 ## Debugging log
 
 Sixteen incidents so far, each with the symptom, how it was localised and the fix:

@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { Evidence } from "@/lib/types";
 
-export function EvidenceList({ evidence, collapsed: collapsedDefault = false }: { evidence: Evidence[]; collapsed?: boolean }) {
+function EvidenceListInner({ evidence, collapsed: collapsedDefault = false }: { evidence: Evidence[]; collapsed?: boolean }) {
   const [override, setOverride] = useState<boolean | null>(null);
   const collapsed = override ?? collapsedDefault;
   const failed = evidence.filter((e) => !e.ok).length;
@@ -27,3 +27,5 @@ export function EvidenceList({ evidence, collapsed: collapsedDefault = false }: 
     </section>
   );
 }
+
+export const EvidenceList = memo(EvidenceListInner);
