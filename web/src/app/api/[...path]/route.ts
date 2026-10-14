@@ -24,10 +24,11 @@ const ALLOW: [RegExp, string[]][] = [
   [/^assistants\/search$/, ["POST"]],
 ];
 
-// Per-IP token bucket: generous for a demo, enough to stop a loop burning the model budget.
-// Lives per function instance; a global limiter would need a shared store.
+// Per-IP token bucket. A normal session makes a burst of small reads per run (thread list, memory,
+// series cards, stream, cancel), so the bucket is sized for people, not for loops: 120 requests,
+// then one per second. Lives per function instance; a global limiter would need a shared store.
 const BUCKET = new Map<string, { tokens: number; at: number }>();
-const RATE = { capacity: 30, refillPerSec: 0.25 }; // 30 requests, then one every 4s
+const RATE = { capacity: 120, refillPerSec: 1 };
 function allow(ip: string): boolean {
   const now = Date.now();
   const b = BUCKET.get(ip) ?? { tokens: RATE.capacity, at: now };
@@ -45,7 +46,7 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
     return Response.json({ error: "not_allowed", path: joined, method: req.method }, { status: 403 });
   }
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-  if (!allow(ip)) return Response.json({ error: "rate_limited" }, { status: 429, headers: { "retry-after": "4" } });
+  if (!allow(ip)) return Response.json({ error: "rate_limited" }, { status: 429, headers: { "retry-after": "1" } });
   const url = new URL(`${TARGET.replace(/\/$/, "")}/${path.join("/")}`);
   url.search = req.nextUrl.search;
 

@@ -60,6 +60,9 @@ function Live() {
   const stream = useStream<AgentState, { InterruptType: PlanReviewInterrupt }>({
     // The SDK builds absolute URLs, so a relative base is rejected ("Invalid URL").
     apiUrl: `${window.location.origin}/api`,
+    // Remember in-flight run ids (session storage): this is what lets stop() cancel the run on the
+    // server, not just close the browser stream, and lets a reload reattach to a run in progress.
+    reconnectOnMount: true,
     assistantId: "macrodesk",
     threadId,
     onThreadId: setThreadId,
@@ -88,6 +91,7 @@ function Live() {
     onMetadataEvent: (m) => { if (m?.run_id) setRunId(m.run_id); },
     onFinish: () => setActive(null),
     onError: () => setActive(null),
+    onStop: () => setActive(null),
   });
   useEffect(() => {
     if (!runId) return;
@@ -115,20 +119,30 @@ function Live() {
 
   const ask = (q: string) => {
     setDone([]); setActive("planner"); setTimings([{ node: "submitted", at: Date.now() }]); setDashOpen(false);
-    stream.submit({ messages: [{ type: "human", content: q }] }, { config: { configurable: { user_id: userId } } });
+    stream.submit({ messages: [{ type: "human", content: q }] }, cfg());
   };
+  // Every submit, including resumes, carries the same configurable: the review node reads
+  // user_id from the *resume* run's config when it stores feedback (audit finding, 2026-10-14).
+  const cfg = () => ({ config: { configurable: { user_id: userId } } });
   const decide = (d: string) => {
     setActive(d === "approve" ? "fetch" : "planner");
     setTimings((t) => [...t, { node: "resumed", at: Date.now() }]);
-    stream.submit(null, { command: { resume: d } });
+    stream.submit(null, { command: { resume: d }, ...cfg() });
   };
   const submitPlan = (p: Plan) => {
     setActive("fetch");
     setTimings((t) => [...t, { node: "resumed", at: Date.now() }]);
-    stream.submit(null, { command: { resume: { plan: p } } });
+    stream.submit(null, { command: { resume: { plan: p } }, ...cfg() });
   };
   const [series, setSeries] = useState<string | null>(null);
   const [showThreads, setShowThreads] = useState(true);
+  // Stop = cancel the run on the server (we know the run id from the metadata event), then close
+  // the stream. With resumable streams the SDK's stop() alone only closes the browser side.
+  const stop = async () => {
+    if (threadId && runId) { try { await stream.client.runs.cancel(threadId, runId); } catch { /* already finished */ } }
+    await stream.stop();
+    setActive(null);
+  };
   const newThread = () => { setThreadId(null); setDone([]); setActive(null); setTimings([]); setRunId(null); setTraceUrl(null); };
   const command = (c: string) => {
     if (c === "/new") newThread();
@@ -149,7 +163,7 @@ function Live() {
       <div className="px-5 py-2 border-b border-line"><CommandBar onAsk={ask} onSeries={setSeries} onCommand={command} /></div>
       <Dashboard mode="live" onAsk={ask} onSeries={setSeries} open={dashOpen} onToggle={() => setDashOpen((o) => !o)} />
       <Run values={stream.values} active={shownActive} done={done} interrupt={interrupt} isLoading={stream.isLoading}
-        error={stream.error ? String(stream.error) : null} onDecide={decide} onSubmitPlan={submitPlan} onAsk={ask} onStop={() => stream.stop()} timings={timings}
+        error={stream.error ? String(stream.error) : null} onDecide={decide} onSubmitPlan={submitPlan} onAsk={ask} onStop={stop} timings={timings}
         runId={runId} traceUrl={traceUrl} onSeries={setSeries} />
       {series && <SeriesCard id={series} onClose={() => setSeries(null)} onAsk={ask} />}
     </Shell>
