@@ -61,3 +61,52 @@ See also [04-reflections.md](04-reflections.md): what I learned, the market, the
 - **A public API surface should be narrow.** The passthrough allows nine endpoint
   shapes and rate-limits by IP; the general server behind it stays general.
 
+## How to recite the architecture
+
+**The 45-second version.**
+
+> macrodesk is a research agent over the Fed's FRED data, built so every number it
+> states can be traced. A planner turns the question into a list of tool calls; a
+> human approves or edits that plan before anything runs; fetch executes it with no
+> model in the loop; an analyst writes from the fetched evidence only; and a critic
+> checks the draft, deterministically for citations and numbers, with a model for
+> prose, and sends it back if anything isn't supported. It's a LangGraph state graph
+> with checkpoints, so every run can be inspected and replayed, and an eval harness
+> measures it in LangSmith: 24 questions, tool choice and grounding at 1.0, critic
+> approval at 1.0.
+
+**The three-minute walk.** Problem first: models are fluent about the economy and
+will cite a 2022 peak from memory; mine did, and the number was roughly right,
+which is the dangerous case. Then the pipeline left to right, one sentence per
+node, stopping on the two choices that matter: the plan is *data* so a person can
+approve it, and fetch has *no model* so it cannot hallucinate. Then the critic: two
+deterministic checks that never misfire, and a model layer that cannot overrule a
+number the regex verified, measured at 0.71 precision before scoping and 1.0
+after. Finish with operations: checkpoints give time travel, the Store remembers
+plan edits, LangSmith gives traces and experiments, and the debugging log has 21
+incidents with symptom, localisation and fix.
+
+**Decisions to defend.**
+- *Why a hand-built graph over the prebuilt agent?* Both are kept. The prebuilt
+  loop lets the model decide everything; the graph separates deciding, approving,
+  doing, writing and checking, so each is testable and observable. The prebuilt
+  agent shipped a wrong citation year in an end-to-end test; the graph's check
+  rejects it.
+- *Why interrupt for a human?* The plan is where cost and risk are decided.
+  `interrupt()` with a payload, `Command(resume=...)` to continue; one path for
+  CLI, API, Studio and web.
+- *Why not just a better prompt?* A prompt lowers the rate; a critic makes it
+  detectable; then the critic has to be measured, because a judge is another model
+  that can be wrong.
+- *What breaks?* Two stories from the log: the shared SQLite connection that passed
+  unit tests and failed on the first real run; the whitelist that let "3.0% peak"
+  through until a labelled set exposed it.
+
+**Numbers to have ready.** 18 tools, 24 eval cases, grounding 1.00, critic approval
+1.00, critic layers at precision and recall 1.0 on labelled drafts, 10 to 45
+seconds per answer, 48 offline tests, 21 logged incidents.
+
+**One habit.** When asked about LangGraph, answer with the mechanism, not the
+brand: state plus reducers, nodes returning partial updates, a checkpoint after
+every step, interrupts for humans, a Store for cross-thread memory.
+
