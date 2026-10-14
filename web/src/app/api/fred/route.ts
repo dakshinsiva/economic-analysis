@@ -3,6 +3,26 @@
  * (never exposed to the browser). Each upstream fetch is cached for an hour; FRED data moves daily at most.
  */
 import { INDICATORS, type Indicator } from "@/lib/indicators";
+import registry from "@/lib/registry.json";
+import { NextRequest } from "next/server";
+
+type Reg = { id: string; title: string; units: string; frequency: string };
+const REG = registry as Reg[];
+const MAX_IDS = 12;
+
+/** Watchlist entries for arbitrary ids: label/units from the registry, else from the id. */
+function specFor(ids: string[]) {
+  return ids.map((id) => {
+    const k = INDICATORS.find((x) => x.id === id);
+    if (k) return k;
+    const reg = REG.find((x) => x.id === id);
+    const freq = (reg?.frequency ?? "M") as Indicator["freq"];
+    const index = /^Index/i.test(reg?.units ?? "");
+    return { id, label: reg?.title?.replace(/\s*\(.*?\)\s*/g, " ").trim().slice(0, 22) ?? id,
+             units: index ? "%" : reg?.units?.includes("Percent") ? "%" : reg?.units?.includes("Thousands") ? "k" : "",
+             freq, changeLabel: freq === "D" ? "vs 3m ago" : freq === "Q" ? "vs prev qtr" : freq === "W" ? "vs 13w ago" : "vs 12m ago", yoy: index };
+  });
+}
 
 type Obs = { date: string; value: string };
 
@@ -18,13 +38,15 @@ async function series(id: string, start: string): Promise<Obs[]> {
   return j.observations.filter((o) => o.value !== ".");
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   if (!process.env.FRED_API_KEY) return Response.json({ error: "FRED_API_KEY not set" }, { status: 503 });
   const start = new Date(Date.now() - 3 * 365 * 86400e3).toISOString().slice(0, 10);
+  const idsParam = req.nextUrl.searchParams.get("ids");
+  const ids = idsParam ? idsParam.toUpperCase().split(",").map((x) => x.trim()).filter(Boolean).slice(0, MAX_IDS) : INDICATORS.map((m) => m.id);
   try {
-    const out: Indicator[] = await Promise.all(INDICATORS.map(async (m) => {
+    const out: Indicator[] = await Promise.all(specFor(ids).map(async (m) => {
       let obs = await series(m.id, start);
-      if (m.id === "PCEPILFE") {
+      if (m.id === "PCEPILFE" || (m as { yoy?: boolean }).yoy) {
         // index -> YoY % change
         const byDate = new Map(obs.map((o) => [o.date, Number(o.value)]));
         obs = obs.flatMap((o) => {
@@ -35,7 +57,7 @@ export async function GET() {
       }
       const vals = obs.map((o) => Number(o.value));
       const last = vals[vals.length - 1];
-      const back = m.freq === "D" ? 63 : m.freq === "W" ? 52 : m.freq === "Q" ? 1 : 12;
+      const back = m.freq === "D" ? 63 : m.freq === "W" ? 13 : m.freq === "Q" ? 1 : 12;
       const prev = vals[Math.max(0, vals.length - 1 - back)];
       const tail = m.freq === "D" ? vals.slice(-250) : vals.slice(-36);
       return { id: m.id, label: m.label, units: m.units, freq: m.freq, latest: last, date: obs[obs.length - 1].date,

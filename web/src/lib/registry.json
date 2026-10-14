@@ -1,0 +1,194 @@
+[
+ {
+  "id": "JTSJOL",
+  "title": "Job Openings: Total Nonfarm (JOLTS)",
+  "units": "Thousands, SA",
+  "frequency": "M",
+  "topic": "labor",
+  "reading": "Labor demand. Falling openings with low layoffs = cooling without pain."
+ },
+ {
+  "id": "JTSHIR",
+  "title": "Hires Rate: Total Nonfarm (JOLTS)",
+  "units": "Percent, SA",
+  "frequency": "M",
+  "topic": "labor",
+  "reading": "Churn. Low hires rate means a 'low hire, low fire' frozen market."
+ },
+ {
+  "id": "JTSQUR",
+  "title": "Quits Rate: Total Nonfarm (JOLTS)",
+  "units": "Percent, SA",
+  "frequency": "M",
+  "topic": "labor",
+  "reading": "Worker confidence. Quits fall when workers fear they cannot find a new job."
+ },
+ {
+  "id": "JTSLDL",
+  "title": "Layoffs and Discharges: Total Nonfarm (JOLTS)",
+  "units": "Thousands, SA",
+  "frequency": "M",
+  "topic": "labor",
+  "reading": "Employer-driven separations. A rise here is the recessionary signal."
+ },
+ {
+  "id": "UNRATE",
+  "title": "Unemployment Rate",
+  "units": "Percent, SA",
+  "frequency": "M",
+  "topic": "labor",
+  "reading": "Headline slack. Sahm rule: +0.5pp from 12-month low of 3mo avg flags recession."
+ },
+ {
+  "id": "PAYEMS",
+  "title": "All Employees: Total Nonfarm",
+  "units": "Thousands, SA",
+  "frequency": "M",
+  "topic": "labor",
+  "reading": "Payroll jobs. Look at monthly change, not level; ~100k/mo is breakeven."
+ },
+ {
+  "id": "ICSA",
+  "title": "Initial Claims",
+  "units": "Number, SA",
+  "frequency": "W",
+  "topic": "labor",
+  "reading": "Highest-frequency layoff gauge. Sustained >300k historically = trouble."
+ },
+ {
+  "id": "GDPC1",
+  "title": "Real Gross Domestic Product",
+  "units": "Billions of chained 2017 $, SAAR",
+  "frequency": "Q",
+  "topic": "growth",
+  "reading": "Output level. Use the % change series for growth rates."
+ },
+ {
+  "id": "A191RL1Q225SBEA",
+  "title": "Real GDP: Percent Change from Preceding Period",
+  "units": "Percent, SAAR",
+  "frequency": "Q",
+  "topic": "growth",
+  "reading": "Headline quarterly growth rate (annualized). Trend ~2%."
+ },
+ {
+  "id": "INDPRO",
+  "title": "Industrial Production Index",
+  "units": "Index 2017=100, SA",
+  "frequency": "M",
+  "topic": "growth",
+  "reading": "Monthly goods-sector output. Early read on manufacturing cycles."
+ },
+ {
+  "id": "CPIAUCSL",
+  "title": "CPI: All Items (Urban)",
+  "units": "Index 1982-84=100, SA",
+  "frequency": "M",
+  "topic": "inflation",
+  "reading": "Headline inflation. Compute YoY % change; Fed target is ~2% on PCE."
+ },
+ {
+  "id": "CPILFESL",
+  "title": "CPI: All Items Less Food & Energy",
+  "units": "Index 1982-84=100, SA",
+  "frequency": "M",
+  "topic": "inflation",
+  "reading": "Core CPI. Strips volatile components; what the Fed watches more closely."
+ },
+ {
+  "id": "PCEPILFE",
+  "title": "PCE Price Index Less Food & Energy",
+  "units": "Index 2017=100, SA",
+  "frequency": "M",
+  "topic": "inflation",
+  "reading": "Core PCE. The Fed's official 2% target measure."
+ },
+ {
+  "id": "DGS3MO",
+  "title": "3-Month Treasury Constant Maturity",
+  "units": "Percent",
+  "frequency": "D",
+  "topic": "rates",
+  "reading": "Short end. Tracks expected Fed policy over the next quarter."
+ },
+ {
+  "id": "DGS2",
+  "title": "2-Year Treasury Constant Maturity",
+  "units": "Percent",
+  "frequency": "D",
+  "topic": "rates",
+  "reading": "Market's view of Fed policy over the next two years."
+ },
+ {
+  "id": "DGS10",
+  "title": "10-Year Treasury Constant Maturity",
+  "units": "Percent",
+  "frequency": "D",
+  "topic": "rates",
+  "reading": "Benchmark long rate. Growth + inflation expectations + term premium."
+ },
+ {
+  "id": "DGS30",
+  "title": "30-Year Treasury Constant Maturity",
+  "units": "Percent",
+  "frequency": "D",
+  "topic": "rates",
+  "reading": "Long end. Sensitive to fiscal and term-premium concerns."
+ },
+ {
+  "id": "T10Y2Y",
+  "title": "10-Year Minus 2-Year Treasury Spread",
+  "units": "Percent",
+  "frequency": "D",
+  "topic": "rates",
+  "reading": "Classic inversion gauge. Negative has preceded every recession since 1970s."
+ },
+ {
+  "id": "T10Y3M",
+  "title": "10-Year Minus 3-Month Treasury Spread",
+  "units": "Percent",
+  "frequency": "D",
+  "topic": "rates",
+  "reading": "NY Fed's preferred recession-probability input."
+ },
+ {
+  "id": "FEDFUNDS",
+  "title": "Effective Federal Funds Rate",
+  "units": "Percent",
+  "frequency": "M",
+  "topic": "rates",
+  "reading": "Actual policy rate. Compare with DGS2 to see market vs Fed."
+ },
+ {
+  "id": "UMCSENT",
+  "title": "U. of Michigan Consumer Sentiment",
+  "units": "Index 1966Q1=100",
+  "frequency": "M",
+  "topic": "other",
+  "reading": "Household mood. Weak link to spending, strong link to politics/prices."
+ },
+ {
+  "id": "HOUST",
+  "title": "Housing Starts: Total",
+  "units": "Thousands of units, SAAR",
+  "frequency": "M",
+  "topic": "other",
+  "reading": "Most rate-sensitive sector. Leads the cycle."
+ },
+ {
+  "id": "RSAFS",
+  "title": "Advance Retail Sales: Retail Trade and Food Services",
+  "units": "Millions $, SA",
+  "frequency": "M",
+  "topic": "other",
+  "reading": "Nominal consumer spending. Deflate with CPI for real growth."
+ },
+ {
+  "id": "USREC",
+  "title": "NBER Recession Indicator",
+  "units": "1 = recession",
+  "frequency": "M",
+  "topic": "other",
+  "reading": "Official recession dating; use for context shading."
+ }
+]

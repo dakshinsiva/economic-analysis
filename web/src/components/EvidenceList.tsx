@@ -1,6 +1,28 @@
 "use client";
 import { memo, useState } from "react";
 import type { Evidence } from "@/lib/types";
+import { parseEvidence } from "@/lib/evidenceTable";
+
+function Result({ text, muted }: { text: string; muted?: boolean }) {
+  const [raw, setRaw] = useState(false);
+  const parsed = raw ? null : parseEvidence(text);
+  if (!parsed) return <pre className={`px-4 pb-1 text-xs font-mono whitespace-pre-wrap ${muted ? "text-fg/80" : "text-fg/90"} max-h-72 overflow-auto`}>{text}</pre>;
+  return (
+    <div className="px-4 pb-1 text-xs">
+      {parsed.pre && <pre className="font-mono whitespace-pre-wrap text-fg/80 mb-1">{parsed.pre}</pre>}
+      <div className="max-h-72 overflow-auto rounded border border-line">
+        <table className="w-full font-mono tabular-nums">
+          {parsed.header && <thead className="bg-line/30 text-muted"><tr>{parsed.header.map((h, i) => <th key={i} className={`px-2 py-1 font-medium ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr></thead>}
+          <tbody>
+            {parsed.rows.map((r, i) => <tr key={i} className="odd:bg-line/10">{r.map((c, k) => <td key={k} className={`px-2 py-0.5 ${k ? "text-right" : "text-left text-muted"}`}>{c}</td>)}</tr>)}
+          </tbody>
+        </table>
+      </div>
+      {parsed.post && <pre className="font-mono whitespace-pre-wrap text-fg/80 mt-1">{parsed.post}</pre>}
+      <button className="text-[11px] text-muted hover:text-fg mt-1" onClick={() => setRaw(true)}>raw</button>
+    </div>
+  );
+}
 
 function EvidenceListInner({ evidence, prior = [], collapsed: collapsedDefault = false }:
   { evidence: Evidence[]; prior?: Evidence[]; collapsed?: boolean }) {
@@ -22,7 +44,7 @@ function EvidenceListInner({ evidence, prior = [], collapsed: collapsedDefault =
               <span className={`h-2 w-2 rounded-full ${e.ok ? "bg-ok" : "bg-bad"}`} />
               <code className="font-mono text-[13px]">{e.tool}({JSON.stringify(e.args)})</code>
             </summary>
-            <pre className="px-4 pb-1 text-xs font-mono whitespace-pre-wrap text-fg/90 max-h-72 overflow-auto">{e.result}</pre>
+            <Result text={e.result} />
             <div className="px-4 pb-2"><button className="btn text-[11px]" onClick={() => copy(e.result)}>copy</button></div>
           </details>
         ))}
@@ -33,7 +55,7 @@ function EvidenceListInner({ evidence, prior = [], collapsed: collapsedDefault =
               <code className="font-mono text-[13px]">{e.tool}({JSON.stringify(e.args)})</code>
               <span className="text-[11px] text-muted ml-1">earlier in this thread</span>
             </summary>
-            <pre className="px-4 pb-3 text-xs font-mono whitespace-pre-wrap text-fg/80 max-h-72 overflow-auto">{e.result}</pre>
+            <Result text={e.result} muted />
           </details>
         ))}
       </div>}

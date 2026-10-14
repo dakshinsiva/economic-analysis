@@ -85,8 +85,21 @@ works with this data rather than for a chat demo:
 *Left, the plan review: the agent has proposed two tool calls and is waiting. Right, the desk on
 arrival in light mode: six indicators with sparklines and 12-month changes; clicking one asks about it.*
 
-- **Macro dashboard.** Unemployment, quits, openings, the 10y–2y spread, core PCE and real GDP, with
-  sparklines and the change over the natural horizon for each. A tile is a question.
+- **A command line, not a chat box.** One input at the top takes a question, a series mnemonic
+  (`UNRATE` opens its card), or a slash command (`/new`, `/threads`, `/prefs`, `/brief`). `⌘K` or
+  `/` focuses it from anywhere; `↑` recalls history; suggestions come from the series registry.
+- **Keyboard first.** `Enter` approves a pending plan, `E` opens the step editor, `Esc` cancels a
+  run or closes a card. A status bar shows live/demo, thread, user, the last run's time, and the keys.
+- **Series cards.** Any series id, in the command line, a dashboard tile or an answer's sources,
+  opens a card: latest value and change, sparkline, metadata, and one-click "ask", "plot" and
+  "revisions and next release" questions.
+- **Macro dashboard as a watchlist.** Unemployment, quits, openings, the 10y–2y spread, core PCE
+  and real GDP by default, with sparklines and the change over the natural horizon; customise the
+  tiles from the registry and they persist.
+- **Monitor pane.** On wide screens, charts, sources and follow-ups stay in a right-hand pane while
+  the answer scrolls on the left.
+- **Evidence as tables.** Date-indexed tool results render as aligned numeric tables with a raw
+  toggle; every block copies with one click.
 - **Plan review in the page.** Approve, type feedback and watch the plan change, or edit the steps
   inline (tool, arguments, add or remove) and run the edited plan. The same `Command(resume=...)`
   path serves the CLI, the REST API and LangGraph Studio.

@@ -151,3 +151,17 @@ checkpointer + store from `DATABASE_URL`; verified against Postgres 16 in Docker
 
 **Passthrough hardening.** The web API route allows only the endpoints the desk uses and
 rate-limits per IP, so a public deployment exposes a narrow surface.
+
+## Terminal-grade interface (web)
+
+The desk takes its interaction model from a trading terminal rather than a chat app:
+
+- `CommandBar.tsx`: one command line for questions, series mnemonics and slash commands, with
+  registry-driven suggestions, history, and `⌘K` / `/` focus from anywhere.
+- `SeriesCard.tsx` + `/api/series/[id]`: a series at a glance, served from FRED server-side.
+- `StatusBar.tsx`: mode, thread, user, last run time, key hints; always visible.
+- Watchlist tiles (`/api/fred?ids=`) persisted per browser; a right-hand monitor pane on wide
+  screens so charts and sources stay in view; evidence rendered as numeric tables
+  (`lib/evidenceTable.ts`); `Enter`/`E`/`Esc` shortcuts handled at the window level, never
+  inside inputs.
+

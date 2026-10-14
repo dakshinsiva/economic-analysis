@@ -40,9 +40,11 @@
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 }
-body { font-family: var(--font-sans); }
+body { font-family: var(--font-sans); font-size: 14px; }
+.tabular-nums, .num { font-variant-numeric: tabular-nums; }
+kbd { font-family: var(--font-mono); }
 .card { @apply rounded-lg border border-line bg-surface shadow-sm overflow-hidden; }
-.card-h { @apply flex items-center gap-2 px-4 py-2 border-b border-line; }
+.card-h { @apply flex items-center gap-2 px-3 py-1.5 border-b border-line; }
 .tag { @apply rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide; }
 .btn { @apply rounded-md border border-line px-3 py-1.5 text-sm hover:bg-line/40 disabled:opacity-50 disabled:hover:bg-transparent; }
 .btn-primary { @apply rounded-md bg-accent text-white px-3 py-1.5 text-sm hover:opacity-90 disabled:opacity-50; }

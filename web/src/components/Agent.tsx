@@ -12,7 +12,10 @@ import { Answer } from "./Answer";
 import { Sidebar, type Pref } from "./Sidebar";
 import { Dashboard } from "./Dashboard";
 import { Trace, type NodeTiming } from "./Trace";
-import { followUps } from "@/lib/cite";
+import { CommandBar } from "./CommandBar";
+import { SeriesCard } from "./SeriesCard";
+import { StatusBar } from "./StatusBar";
+import { citedSeries, followUps } from "@/lib/cite";
 import { useDemo } from "@/lib/useDemo";
 import { EXAMPLES, type AgentState, type NodeName, type Plan, type PlanReviewInterrupt, textOf } from "@/lib/types";
 
@@ -124,16 +127,31 @@ function Live() {
     setTimings((t) => [...t, { node: "resumed", at: Date.now() }]);
     stream.submit(null, { command: { resume: { plan: p } } });
   };
+  const [series, setSeries] = useState<string | null>(null);
+  const [showThreads, setShowThreads] = useState(true);
+  const newThread = () => { setThreadId(null); setDone([]); setActive(null); setTimings([]); setRunId(null); setTraceUrl(null); };
+  const command = (c: string) => {
+    if (c === "/new") newThread();
+    else if (c === "/threads") setShowThreads((v) => !v);
+    else if (c === "/prefs") refresh();
+    else if (c === "/brief") ask("Give me today's macro brief: labor market (JOLTS and unemployment), the yield curve, and growth and core inflation, with the latest readings and 12-month changes.");
+    else if (c === "/demo") window.location.search = "?demo=1";
+    else if (c === "/help") alert("⌘K or / focuses the command line. Type a question, a series id (UNRATE) for its card, or / for commands.\nEnter approves a pending plan, E edits it, Esc cancels or closes.");
+  };
+  const lastRunSeconds = timings.length > 1 ? (timings[timings.length - 1].at - timings[0].at) / 1000 : null;
 
   return (
-    <Shell mode="live" sidebar={<Sidebar mode="live" threads={threads} currentId={threadId} prefs={prefs}
+    <Shell mode="live" sidebar={showThreads ? <Sidebar mode="live" threads={threads} currentId={threadId} prefs={prefs}
       userId={userId} onUserId={(u) => { const v = u.trim() || "default"; setUserId(v); try { localStorage.setItem("macrodesk.user", v); } catch {} }}
       onPick={(id) => { setThreadId(id); setDone(["planner", "review", "fetch", "analyst", "critic", "finalize"]); setActive(null); setTimings([]); }}
-      onNew={() => { setThreadId(null); setDone([]); setActive(null); setTimings([]); setRunId(null); setTraceUrl(null); }} />}>
-      <Dashboard mode="live" onAsk={ask} open={dashOpen} onToggle={() => setDashOpen((o) => !o)} />
+      onNew={newThread} /> : null}
+      status={<StatusBar mode="live" threadId={threadId} userId={userId} active={shownActive} lastRunSeconds={lastRunSeconds} backendHost={typeof window !== "undefined" ? window.location.host : null} />}>
+      <div className="px-5 py-2 border-b border-line"><CommandBar onAsk={ask} onSeries={setSeries} onCommand={command} /></div>
+      <Dashboard mode="live" onAsk={ask} onSeries={setSeries} open={dashOpen} onToggle={() => setDashOpen((o) => !o)} />
       <Run values={stream.values} active={shownActive} done={done} interrupt={interrupt} isLoading={stream.isLoading}
         error={stream.error ? String(stream.error) : null} onDecide={decide} onSubmitPlan={submitPlan} onAsk={ask} onStop={() => stream.stop()} timings={timings}
-        runId={runId} traceUrl={traceUrl} />
+        runId={runId} traceUrl={traceUrl} onSeries={setSeries} />
+      {series && <SeriesCard id={series} onClose={() => setSeries(null)} onAsk={ask} />}
     </Shell>
   );
 }
@@ -161,14 +179,25 @@ function Demo() {
     }
     d.resume("approve");
   };
+  const [series, setSeries] = useState<string | null>(null);
+  const replay = () => { setAutoplay(false); d.reset(); setTimeout(() => d.start(), 50); };
+  const command = (c: string) => {
+    if (c === "/demo" || c === "/new") replay();
+    else if (c === "/help") alert("⌘K or / focuses the command line. Type a series id (UNRATE) for its card. Questions run live when a backend is attached.");
+    else setNotice("That command needs a live backend; this is the recorded replay.");
+  };
   return (
-    <Shell mode="demo" sidebar={<Sidebar mode="demo" threads={[]} currentId={null} prefs={[]} onPick={() => {}} onNew={() => { setAutoplay(false); d.reset(); }} />}>
-      <Dashboard mode="demo" onAsk={() => { setAutoplay(false); d.reset(); setTimeout(() => d.start(), 50); }}
+    <Shell mode="demo" sidebar={<Sidebar mode="demo" threads={[]} currentId={null} prefs={[]} onPick={() => {}} onNew={() => { setAutoplay(false); d.reset(); }} />}
+      status={<StatusBar mode="demo" threadId="recorded" active={d.active} lastRunSeconds={d.timings.length > 1 ? (d.timings[d.timings.length - 1].at - d.timings[0].at) / 1000 : null} />}>
+      <div className="px-5 py-2 border-b border-line"><CommandBar onAsk={() => { setNotice("Questions run live when a backend is attached; replaying the recorded run."); replay(); }} onSeries={setSeries} onCommand={command}
+        placeholder="Type a series id (UNRATE) for its card, or / for commands · questions need a live backend" /></div>
+      <Dashboard mode="demo" onAsk={replay} onSeries={setSeries}
         open={dashOpen && !started} onToggle={() => setDashOpen((o) => !o)} />
+      {series && <SeriesCard id={series} onClose={() => setSeries(null)} onAsk={() => { setSeries(null); replay(); }} />}
       {notice && <div className="mx-5 mt-3 rounded-md border border-plan/40 bg-plan/10 px-3 py-2 text-sm">{notice}</div>}
       <Run values={d.values} active={d.active} done={d.done} interrupt={d.interrupt} isLoading={d.isLoading} error={null}
-        onDecide={decide} onAsk={() => { setAutoplay(false); d.reset(); setTimeout(() => d.start(), 50); }} onStop={d.reset}
-        demoQuestion={d.question} timings={d.timings} autoApproveIn={autoplay ? 6 : undefined} />
+        onDecide={decide} onAsk={replay} onStop={d.reset}
+        demoQuestion={d.question} timings={d.timings} autoApproveIn={autoplay ? 6 : undefined} onSeries={setSeries} />
     </Shell>
   );
 }
@@ -201,7 +230,7 @@ function HowItWorks() {
   );
 }
 
-function Shell({ mode, sidebar, children }: { mode: "live" | "demo"; sidebar: React.ReactNode; children: React.ReactNode }) {
+function Shell({ mode, sidebar, status, children }: { mode: "live" | "demo"; sidebar: React.ReactNode; status?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex h-dvh">
       {sidebar}
@@ -216,17 +245,41 @@ function Shell({ mode, sidebar, children }: { mode: "live" | "demo"; sidebar: Re
           <a className="text-sm text-muted hover:text-fg" href="https://github.com/dakshinsiva/macrodesk" target="_blank" rel="noreferrer">GitHub ↗</a>
         </header>
         {children}
+        {status}
       </div>
     </div>
   );
 }
 
-function Run({ values, active, done, interrupt, isLoading, error, onDecide, onSubmitPlan, onAsk, onStop, demoQuestion, timings, autoApproveIn, runId, traceUrl }: {
+function useWide(min = 1280) {
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${min}px)`);
+    const on = () => setWide(mq.matches);
+    const id = setTimeout(on, 0);
+    mq.addEventListener("change", on);
+    return () => { clearTimeout(id); mq.removeEventListener("change", on); };
+  }, [min]);
+  return wide;
+}
+
+function Run({ values, active, done, interrupt, isLoading, error, onDecide, onSubmitPlan, onAsk, onStop, demoQuestion, timings, autoApproveIn, runId, traceUrl, onSeries }: {
   values: AgentState; active: NodeName | null; done: NodeName[]; interrupt: PlanReviewInterrupt | null; isLoading: boolean;
   error: string | null; onDecide: (d: string) => void; onSubmitPlan?: (p: Plan) => void; onAsk: (q: string) => void; onStop: () => void; demoQuestion?: string;
-  timings: NodeTiming[]; autoApproveIn?: number; runId?: string | null; traceUrl?: string | null;
+  timings: NodeTiming[]; autoApproveIn?: number; runId?: string | null; traceUrl?: string | null; onSeries?: (id: string) => void;
 }) {
-  const [q, setQ] = useState("");
+  const wide = useWide();
+  // Keyboard: Enter approves a pending plan, Esc stops a run (outside inputs). "E" is handled by the plan card.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(t?.tagName ?? "") || t?.isContentEditable) return;
+      if (interrupt && e.key === "Enter") { e.preventDefault(); onDecide("approve"); }
+      else if (e.key === "Escape" && isLoading) onStop();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [interrupt, isLoading, onDecide, onStop]);
   const msgs = useMemo(() => values.messages ?? [], [values.messages]);
   const lastHuman = useMemo(() => [...msgs].reverse().find((m) => m.type === "human"), [msgs]);
   const lastAi = useMemo(() => [...msgs].reverse().find((m) => m.type === "ai"), [msgs]);
@@ -270,8 +323,9 @@ function Run({ values, active, done, interrupt, isLoading, error, onDecide, onSu
         <Pipeline active={active} done={done} />
         {isLoading && <button className="btn text-xs" onClick={onStop}>stop</button>}
       </div>
+      <div className="flex-1 flex min-h-0">
       <main ref={scroller} onScroll={onScroll} onWheel={onWheel} onTouchMove={onTouchMove}
-        className="relative flex-1 overflow-y-auto px-5 py-4 space-y-4 w-full scroll-smooth">
+        className="relative flex-1 overflow-y-auto px-5 py-4 space-y-4 w-full scroll-smooth min-w-0">
        <div className="max-w-4xl mx-auto space-y-4">
         {empty && (
           <div className="py-10">
@@ -290,12 +344,12 @@ function Run({ values, active, done, interrupt, isLoading, error, onDecide, onSu
           collapsed={done.includes("fetch")} />}
         {(!!values.evidence?.length || !!values.prior_evidence?.length) && done.includes("fetch") &&
           <EvidenceList key={"ev" + runKey} evidence={values.evidence ?? []} prior={values.prior_evidence ?? []} collapsed={!!values.draft || !!finalReady} />}
-        {values.charts?.map((c, i) => <ChartCard key={i} chart={c} />)}
+        {!wide && values.charts?.map((c, i) => <ChartCard key={i} chart={c} />)}
         {values.draft && !finalReady && <Answer text={values.draft} draft streaming={active === "analyst"} />}
         {values.critique && <CriticCard critique={values.critique} revisions={values.revisions} />}
         {finalReady && <div ref={answerRef} className="scroll-mt-3">
-          <Answer text={textOf(lastAi!)} onFollowUp={demoQuestion ? undefined : onAsk}
-            followUps={followUps(textOf(lastAi!), lastHuman ? textOf(lastHuman) : "")} />
+          <Answer text={textOf(lastAi!)} onFollowUp={demoQuestion ? undefined : onAsk} onSeries={onSeries}
+            followUps={wide ? [] : followUps(textOf(lastAi!), lastHuman ? textOf(lastHuman) : "")} />
         </div>}
         {finalReady && <Trace timings={timings} values={values} runId={runId} traceUrl={traceUrl} />}
         <div ref={anchor} aria-hidden className="h-px" />
@@ -313,12 +367,24 @@ function Run({ values, active, done, interrupt, isLoading, error, onDecide, onSu
           <button onClick={jump} className="sticky bottom-3 left-1/2 -translate-x-1/2 btn-primary shadow-lg text-xs">↓ jump to latest</button>
         )}
       </main>
-      {!demoQuestion && (
-        <form className="border-t border-line px-5 py-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (q.trim()) { onAsk(q.trim()); setQ(""); } }}>
-          <input className="input flex-1" placeholder="Ask about JOLTS, GDP, inflation, the yield curve…" value={q} onChange={(e) => setQ(e.target.value)} disabled={isLoading} />
-          <button className="btn-primary" disabled={isLoading || !q.trim()}>Ask</button>
-        </form>
+      {wide && lastHuman && (
+        <aside className="w-[400px] shrink-0 border-l border-line overflow-y-auto p-3 space-y-3" aria-label="monitor">
+          <div className="text-[11px] text-muted font-mono">MONITOR · charts, sources and follow-ups stay here while you read</div>
+          {values.charts?.map((c, i) => <ChartCard key={i} chart={c} compact />)}
+          {finalReady && (
+            <div className="card p-3 space-y-2 text-xs">
+              <div className="text-muted">sources</div>
+              <div className="flex flex-wrap gap-1">{citedSeries(textOf(lastAi!)).map((id) => <button key={id} className="tag bg-line/50 text-fg hover:bg-line font-mono normal-case" onClick={() => onSeries?.(id)}>{id}</button>)}</div>
+              {!demoQuestion && <>
+                <div className="text-muted pt-1">follow up</div>
+                <div className="flex flex-col gap-1 items-start">{followUps(textOf(lastAi!), lastHuman ? textOf(lastHuman) : "").map((f) => <button key={f} className="btn text-xs text-left" onClick={() => onAsk(f)}>{f}</button>)}</div>
+              </>}
+            </div>
+          )}
+          {!values.charts?.length && !finalReady && <div className="text-xs text-muted">Charts and sources appear here as the run produces them.</div>}
+        </aside>
       )}
+      </div>
     </>
   );
 }

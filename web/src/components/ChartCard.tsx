@@ -7,7 +7,7 @@ import { chartToCsv, download, svgToPng } from "@/lib/export";
 
 const PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300"];
 
-function ChartCardInner({ chart }: { chart: Chart }) {
+function ChartCardInner({ chart, compact = false }: { chart: Chart; compact?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const slug = chart.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
   const exportPng = async () => {
@@ -41,7 +41,7 @@ function ChartCardInner({ chart }: { chart: Chart }) {
                 <span><span className="font-mono font-semibold">{p.id}</span> <span className="text-muted">{p.title}</span></span>
                 <span className="text-muted">{p.units}</span>
               </div>
-              <ResponsiveContainer width="100%" height={150}>
+              <ResponsiveContainer width="100%" height={compact ? 110 : 150}>
                 <LineChart data={data} margin={{ top: 8, right: 48, bottom: 0, left: 0 }}>
                   {chart.recessions.map((r, k) => (
                     <ReferenceArea key={k} x1={new Date(r.from).getTime()} x2={new Date(r.to).getTime()} fill="var(--color-line)" fillOpacity={0.5} strokeOpacity={0} />

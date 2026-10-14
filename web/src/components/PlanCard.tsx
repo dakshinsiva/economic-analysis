@@ -5,16 +5,6 @@ import type { Plan } from "@/lib/types";
 function PlanCardInner({ plan, awaiting, onDecide, onSubmitPlan, autoApproveIn, collapsed: collapsedDefault = false }:
   { plan: Plan; awaiting: boolean; onDecide?: (d: string) => void; onSubmitPlan?: (p: Plan) => void; autoApproveIn?: number; collapsed?: boolean }) {
   const [fb, setFb] = useState("");
-  const [editing, setEditing] = useState(false);
-  const [draftSteps, setDraftSteps] = useState<{ tool: string; args: string; why: string }[]>([]);
-  const [err, setErr] = useState<string | null>(null);
-  const startEdit = () => { cancel(); setDraftSteps(plan.steps.map((s) => ({ tool: s.tool, args: JSON.stringify(s.args), why: s.why }))); setEditing(true); };
-  const submitEdit = () => {
-    try {
-      const steps = draftSteps.map((s) => ({ tool: s.tool, args: JSON.parse(s.args || "{}"), why: s.why }));
-      setErr(null); setEditing(false); onSubmitPlan?.({ goal: plan.goal, steps });
-    } catch (e) { setErr(`Step arguments must be valid JSON: ${String(e)}`); }
-  };
   const [override, setOverride] = useState<boolean | null>(null);
   const collapsed = !awaiting && (override ?? collapsedDefault);
   // Demo autoplay: count down to approval unless the visitor touches the controls.
@@ -34,6 +24,28 @@ function PlanCardInner({ plan, awaiting, onDecide, onSubmitPlan, autoApproveIn, 
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [awaiting, autoApproveIn]);
+  const [editing, setEditing] = useState(false);
+  const [draftSteps, setDraftSteps] = useState<{ tool: string; args: string; why: string }[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+  const startEdit = () => { cancel(); setDraftSteps(plan.steps.map((s) => ({ tool: s.tool, args: JSON.stringify(s.args), why: s.why }))); setEditing(true); };
+  // Keyboard: "E" opens the editor while the plan awaits review (outside inputs).
+  useEffect(() => {
+    if (!awaiting || !onSubmitPlan) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(t?.tagName ?? "") || t?.isContentEditable) return;
+      if (e.key.toLowerCase() === "e" && !editing) { e.preventDefault(); queueMicrotask(startEdit); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaiting, onSubmitPlan, editing]);
+  const submitEdit = () => {
+    try {
+      const steps = draftSteps.map((s) => ({ tool: s.tool, args: JSON.parse(s.args || "{}"), why: s.why }));
+      setErr(null); setEditing(false); onSubmitPlan?.({ goal: plan.goal, steps });
+    } catch (e) { setErr(`Step arguments must be valid JSON: ${String(e)}`); }
+  };
   return (
     <section className="card border-l-4 border-l-plan">
       <button className="card-h w-full text-left" onClick={() => !awaiting && setOverride(!collapsed)} aria-expanded={!collapsed}>

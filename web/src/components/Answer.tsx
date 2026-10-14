@@ -3,8 +3,8 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { citedSeries, linkCitations } from "@/lib/cite";
 
-export function Answer({ text, draft, onFollowUp, followUps, streaming }:
-  { text: string; draft?: boolean; onFollowUp?: (q: string) => void; followUps?: string[]; streaming?: boolean }) {
+export function Answer({ text, draft, onFollowUp, followUps, streaming, onSeries }:
+  { text: string; draft?: boolean; onFollowUp?: (q: string) => void; followUps?: string[]; streaming?: boolean; onSeries?: (id: string) => void }) {
   const [copied, setCopied] = useState(false);
   // Belt and braces: the analyst is told not to emit file paths, but strip any that slip through.
   const clean = text
@@ -40,7 +40,9 @@ export function Answer({ text, draft, onFollowUp, followUps, streaming }:
           {ids.length > 0 && (
             <div className="flex flex-wrap items-center gap-1 text-xs">
               <span className="text-muted mr-1">sources</span>
-              {ids.map((id) => <a key={id} className="tag bg-line/50 text-fg hover:bg-line font-mono normal-case" href={`https://fred.stlouisfed.org/series/${id}`} target="_blank" rel="noreferrer">{id} ↗</a>)}
+              {ids.map((id) => onSeries
+                ? <button key={id} className="tag bg-line/50 text-fg hover:bg-line font-mono normal-case" onClick={() => onSeries(id)} title="series card">{id}</button>
+                : <a key={id} className="tag bg-line/50 text-fg hover:bg-line font-mono normal-case" href={`https://fred.stlouisfed.org/series/${id}`} target="_blank" rel="noreferrer">{id} ↗</a>)}
             </div>
           )}
           {onFollowUp && followUps?.length ? (
