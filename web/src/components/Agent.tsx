@@ -21,6 +21,10 @@ import { EXAMPLES, type AgentState, type NodeName, type Plan, type PlanReviewInt
 
 type Mode = "checking" | "live" | "demo";
 
+/** Wall-clock stamp for the trace. Lives outside the component so handlers created during render
+ * do not call the impure global directly (react-hooks/purity); they only ever run on events. */
+const wallClock = () => Date.now();
+
 export const APP_NAME = "macrodesk";
 export const APP_TAGLINE = "an agentic macro research desk over FRED";
 
@@ -68,7 +72,7 @@ function Live() {
     onThreadId: setThreadId,
     onUpdateEvent: (data) => {
       // An update means node `n` finished; the next node is now running.
-      const now = Date.now();
+      const now = wallClock();
       const d = data as Record<string, Partial<AgentState> | undefined>;
       for (const n of Object.keys(d).filter((k) => k !== "__interrupt__") as NodeName[]) {
         setDone((prev) => (prev.includes(n) ? prev : [...prev, n]));
@@ -118,7 +122,7 @@ function Live() {
   const shownActive: NodeName | null = interrupt ? "review" : active;
 
   const ask = (q: string) => {
-    setDone([]); setActive("planner"); setTimings([{ node: "submitted", at: Date.now() }]); setDashOpen(false);
+    setDone([]); setActive("planner"); setTimings([{ node: "submitted", at: wallClock() }]); setDashOpen(false);
     stream.submit({ messages: [{ type: "human", content: q }] }, cfg());
   };
   // Every submit, including resumes, carries the same configurable: the review node reads
@@ -126,12 +130,12 @@ function Live() {
   const cfg = () => ({ config: { configurable: { user_id: userId } } });
   const decide = (d: string) => {
     setActive(d === "approve" ? "fetch" : "planner");
-    setTimings((t) => [...t, { node: "resumed", at: Date.now() }]);
+    setTimings((t) => [...t, { node: "resumed", at: wallClock() }]);
     stream.submit(null, { command: { resume: d }, ...cfg() });
   };
   const submitPlan = (p: Plan) => {
     setActive("fetch");
-    setTimings((t) => [...t, { node: "resumed", at: Date.now() }]);
+    setTimings((t) => [...t, { node: "resumed", at: wallClock() }]);
     stream.submit(null, { command: { resume: { plan: p } }, ...cfg() });
   };
   const [series, setSeries] = useState<string | null>(null);
