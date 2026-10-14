@@ -249,6 +249,24 @@ facts, do not OR them. Let the exact one decide what it can decide, and scope
 the judge to the rest. And measure the judge; the two false positives were
 invisible until `run_critic_evals.py --llm` put a number on them.
 
+## 21. "This model does not support assistant message prefill"
+**Symptom.** A shared LangSmith trace of `macrodesk_v1` from Studio: status
+error after 16 s, inputs `{"input": null}`, an Anthropic 400 saying the
+conversation must end with a user message.
+**Cause.** Studio re-ran the thread from its last checkpoint with no new input.
+The thread's last message was the assistant's own answer, so the prebuilt
+ReAct loop called the model with a conversation ending in an assistant turn.
+Claude 4.6 and later treat that as a prefill and reject it. The Stage 2 graph is
+immune because its planner builds a fresh system + human prompt every turn.
+**How found.** `Client.list_shared_runs(share_token)` on the public link gave
+the run, its metadata (`from_studio`, `graph_id`, `checkpoint_id`) and the
+error text; no clicking required.
+**Fix.** A `before_model` middleware on the v1 agent: if the last message is an
+assistant message with no tool calls, jump to `end`. Resuming a finished
+thread is now a no-op instead of a 400. Test added.
+**Lesson.** `input: null` means "resume", and a resumed graph does whatever its
+first node does with the existing state. Make that first node safe to re-enter.
+
 ## Toolkit cheat-sheet
 
 | Question | Tool |

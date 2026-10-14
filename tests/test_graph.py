@@ -65,3 +65,17 @@ def test_agent_recovers_from_tool_error(monkeypatch, fake_fred):
     tool_msgs = [m for m in out["messages"] if isinstance(m, ToolMessage)]
     assert [m.name for m in tool_msgs] == ["get_series", "search_fred", "get_series"]
     assert tool_msgs[0].content.startswith("ERROR")
+
+
+def test_resuming_a_finished_thread_does_not_call_the_model(monkeypatch, fake_fred):
+    """Studio 'continue' / invoke(None) on a thread whose last message is the answer: v1 must end,
+    not send an assistant-terminated conversation (a prefill, rejected by Claude 4.6+)."""
+    script = scripted(AIMessage(content="Done (JTSQUR, 2026-08-01)."), AIMessage(content="SHOULD NOT BE CALLED"))
+    monkeypatch.setattr(graph_mod, "make_model", lambda: script)
+    g = graph_mod.build_graph(checkpointer=InMemorySaver())
+    cfg = {"configurable": {"thread_id": "t3"}}
+    g.invoke({"messages": [HumanMessage("quits?")]}, cfg)
+    before = len(g.get_state(cfg).values["messages"])
+    g.invoke(None, cfg)  # resume with no input
+    after = g.get_state(cfg).values["messages"]
+    assert len(after) == before and after[-1].content == "Done (JTSQUR, 2026-08-01)."

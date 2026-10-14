@@ -33,11 +33,24 @@ Today's date is available from the latest observations; JOLTS lags ~6 weeks, GDP
 
 def build_graph(checkpointer: BaseCheckpointSaver | None = None):
     from langchain.agents import create_agent
+    from langchain.agents.middleware import before_model
+    from langchain_core.messages import AIMessage
+
+    @before_model(can_jump_to=["end"])
+    def nothing_to_answer(state, runtime):
+        """Resuming a finished thread with no new input (Studio 'continue', `invoke(None)`) would send a
+        conversation that ends with the assistant's own message. Claude 4.6+ rejects that as a prefill
+        (debugging note 21). End the run instead; the state is unchanged."""
+        msgs = state.get("messages") or []
+        if msgs and isinstance(msgs[-1], AIMessage) and not msgs[-1].tool_calls:
+            return {"jump_to": "end"}
+        return None
 
     return create_agent(
         model=make_model(),
         tools=ALL_TOOLS,
         system_prompt=SYSTEM_PROMPT,
+        middleware=[nothing_to_answer],
         checkpointer=checkpointer,
         name="macrodesk_v1",
     )
