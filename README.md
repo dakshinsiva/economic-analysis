@@ -171,7 +171,7 @@ The research desk, against that server:
 cd web && npm install
 cp .env.example .env.local      # LANGGRAPH_API_URL=http://127.0.0.1:2024, FRED_API_KEY for the dashboard
 npm run dev                     # http://localhost:3000 ; add ?demo=1 to force the recorded replay
-npm test && npm run test:e2e    # vitest unit tests; Playwright replay test
+npm test && npm run test:e2e    # vitest unit tests; Playwright replay test and a button-and-link audit
 ```
 
 Set `DATABASE_URL` to a Postgres URL and both the checkpointer and the Store move there, for
@@ -234,7 +234,7 @@ design, single-machine persistence, six eval cases, one model tuned.
 
 ## Debugging log
 
-Twenty-one incidents so far, each with the symptom, how it was localised and the fix:
+Twenty-four incidents so far, each with the symptom, how it was localised and the fix:
 a native wheel that tried to compile Rust, a gateway that silently rewrote the model endpoint, a
 400 from a prompt with no user turn (twice: once in Studio, once in my own critic), a circular
 import, Pydantic objects in checkpointed state, a critic that rejected correct arithmetic, two

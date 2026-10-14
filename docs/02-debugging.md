@@ -267,6 +267,46 @@ thread is now a no-op instead of a 400. Test added.
 **Lesson.** `input: null` means "resume", and a resumed graph does whatever its
 first node does with the existing state. Make that first node safe to re-enter.
 
+## 22. Feedback remembered under the wrong user
+**Symptom.** A scripted audit set the user id, asked a question, gave plan
+feedback, and the sidebar never showed it as remembered.
+**Cause.** The question's run carried `configurable.user_id`; the *resume*
+run (approve or feedback) did not. The review node reads the user id from the
+run it executes in, which is the resume, so the feedback was filed under
+"default".
+**Fix.** Every submit, including resumes and edited plans, passes the same
+configurable.
+**Lesson.** In LangGraph a resumed node runs under the config of the resume
+request, not the original. Anything identity-shaped must travel with every
+submit.
+
+## 23. Stop closed the browser stream and the run kept going
+**Symptom.** Clicking stop (or pressing Esc) returned the page to idle, but the
+server finished the run and wrote the answer anyway; no cancel request was
+ever sent.
+**Cause.** With `reconnectOnMount` the SDK makes streams resumable and sets
+disconnect behaviour to "continue", by design: a reload should be able to
+reattach. Its own cancel path needs a stored run id that this flow never wrote.
+**How found.** A Playwright probe that stops mid-analysis, waits 25 s, and
+inspects the thread on the server: evidence present, draft and critic present
+too. Then reading `manager.js` and `stream.lgp.js` for `stop`.
+**Fix.** The app cancels explicitly: `client.runs.cancel(threadId, runId)` with
+the run id from the metadata event, then `stream.stop()`. Re-probed: run status
+`interrupted`, evidence fetched, no draft, no answer.
+**Lesson.** "Stop" has two halves, the client stream and the server run, and a
+library may only do one of them. Verify on the server, not in the UI.
+
+## 24. My own rate limiter broke the app
+**Symptom.** The live audit failed three unrelated checks, and the console
+held one line: `HTTP 429 rate_limited`.
+**Cause.** The passthrough bucket was 30 requests then one every four seconds.
+One real session makes a burst per run: thread list, memory, series cards, the
+stream, the cancel. The audit crossed the line in a minute; a person would in
+an afternoon.
+**Fix.** 120 requests then one per second, which still stops a loop.
+**Lesson.** Size protective limits from a measured session, and run the
+protection in the same audit as the features it protects.
+
 ## Toolkit cheat-sheet
 
 | Question | Tool |
