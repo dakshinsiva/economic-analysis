@@ -10,3 +10,5 @@ outputs/
 .langgraph_api/
 .pytest_cache/
 dist/
+.DS_Store
+.claude/

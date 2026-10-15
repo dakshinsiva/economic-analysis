@@ -253,7 +253,7 @@ def repl(graph, thread_id: str, store=None, saver=None) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    p = argparse.ArgumentParser(prog="macrodesk", description="FRED economic-analysis agent")
+    p = argparse.ArgumentParser(prog="macrodesk", description="macrodesk: an agentic macro research desk over FRED")
     p.add_argument("question", nargs="*", help="one-shot question; omit for REPL")
     p.add_argument("--thread", default=None, help="thread name/id to resume or create (default: new random id)")
     p.add_argument("--last", action="store_true", help="resume the most recently updated thread")

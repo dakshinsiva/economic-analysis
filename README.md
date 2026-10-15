@@ -1,6 +1,8 @@
-# macrodesk — an agentic macro research desk over FRED
+# macrodesk
 
-[![tests](https://github.com/dakshinsiva/economic-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/dakshinsiva/economic-analysis/actions/workflows/ci.yml)
+**An agentic macro research desk over FRED.**
+
+[![tests](https://github.com/dakshinsiva/macrodesk/actions/workflows/ci.yml/badge.svg)](https://github.com/dakshinsiva/macrodesk/actions/workflows/ci.yml)
 ![python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![langgraph](https://img.shields.io/badge/langgraph-1.x-1c3c3c)
 ![next](https://img.shields.io/badge/next.js-16-black)
@@ -115,7 +117,7 @@ arrival in light mode: six indicators with sparklines and 12-month changes; clic
 - **Demo mode.** With no backend configured the page replays a recorded run, so the deployed URL
   always shows the whole pipeline.
 
-## What comes out
+## Output
 
 From a run on 2026-10-13, *"What does the latest JOLTS report say about the labor market?"*:
 
@@ -148,7 +150,7 @@ verified numbers were allowed to overrule it (debugging note 20). The first eval
 two bugs the unit tests had passed over (notes 11 and 12). Typical answer latency is now 10 to
 45 seconds with the fetch steps running concurrently.
 
-## Running it
+## Setup
 
 Python side (the agent, CLI, LangGraph server):
 
@@ -189,7 +191,7 @@ The Next.js app deploys to Vercel as is. Point `LANGGRAPH_API_URL` and `LANGSMIT
 LangSmith Deployment of this graph for a live backend, or set `NEXT_PUBLIC_DEMO=1` for the replay.
 `FRED_API_KEY` on the server enables the live dashboard; without it the recorded snapshot is shown.
 
-## Design notes
+## Decisions
 
 - **Plan as data.** Structured output turns "which tools" into something a human can approve or edit
   before any time or money is spent, and something tests can assert on exactly.
@@ -242,7 +244,7 @@ libraries sharing one SQLite connection, and a `copy_thread` that exists on the 
 SQLite, two from wiring the web app, and three from the planner's arguments, the analyst citing
 an earlier answer, and a leaky number whitelist. [docs/02-debugging.md](docs/02-debugging.md).
 
-## Repository layout
+## Layout
 
 | Path | What it is |
 |---|---|

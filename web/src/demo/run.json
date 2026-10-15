@@ -93,7 +93,7 @@
     "start": "2019-01-01",
     "title": "JOLTS: Job Openings (thousands) & Quits Rate (%) since 2019"
    },
-   "result": "Chart saved to /Users/dakshinsiva/economic-analysis/outputs/jolts-job-openings-thousands-quits-rate--2026-10-13.png\nPlotted: JTSJOL 2019-01-01..2026-08-01 latest 7,079.00 Thousands, SA; JTSQUR 2019-01-01..2026-08-01 latest 1.90 Percent, SA",
+   "result": "Chart saved to outputs/jolts-job-openings-thousands-quits-rate--2026-10-13.png\nPlotted: JTSJOL 2019-01-01..2026-08-01 latest 7,079.00 Thousands, SA; JTSQUR 2019-01-01..2026-08-01 latest 1.90 Percent, SA",
    "ok": true
   }
  ],
