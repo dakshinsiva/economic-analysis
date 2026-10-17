@@ -1,4 +1,4 @@
-# 03 - Interview talking points (draft, grows with each stage)
+# 03 - Design decisions and trade-offs
 
 - **Why LangGraph over a plain loop?** Persistence (checkpointer -> threads,
   time travel), interrupts for human-in-the-loop, streaming of per-node updates,
@@ -61,7 +61,7 @@ See also [04-reflections.md](04-reflections.md): what I learned, the market, the
 - **A public API surface should be narrow.** The passthrough allows nine endpoint
   shapes and rate-limits by IP; the general server behind it stays general.
 
-## How to recite the architecture
+## The architecture in two minutes
 
 **The 45-second version.**
 
